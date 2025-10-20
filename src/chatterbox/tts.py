@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+import warnings
 
 import librosa
 import torch
@@ -15,6 +16,10 @@ from .models.tokenizers import EnTokenizer
 from .models.voice_encoder import VoiceEncoder
 from .models.t3.modules.cond_enc import T3Cond
 
+# Suppress known deprecation warnings from external libraries
+warnings.filterwarnings('ignore', message='.*LoRACompatibleLinear.*', category=FutureWarning)
+warnings.filterwarnings('ignore', message='.*past_key_values.*tuple of tuples.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*input hidden states.*silently casted.*', category=UserWarning)
 
 REPO_ID = "ResembleAI/chatterbox"
 
