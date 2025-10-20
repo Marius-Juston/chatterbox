@@ -136,7 +136,7 @@ def optimize_hifigan_inference(hifigan, enable_bf16: bool = True, enable_compile
 
         # Use autocast context for automatic BF16 conversion
         autocast_enabled = enable_bf16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported()
-        with torch.cuda.amp.autocast(dtype=torch.bfloat16, enabled=autocast_enabled):
+        with torch.amp.autocast('cuda', dtype=torch.bfloat16, enabled=autocast_enabled):
             # mel->f0
             t0 = time.time()
             f0 = hifigan.f0_predictor(speech_feat)
@@ -218,7 +218,7 @@ def optimize_flow_decoder(flow_model, n_timesteps: int = 4, enable_bf16: bool = 
 
         # Use autocast context for automatic BF16 conversion
         autocast_enabled = enable_bf16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported()
-        with torch.cuda.amp.autocast(dtype=torch.bfloat16, enabled=autocast_enabled):
+        with torch.amp.autocast('cuda', dtype=torch.bfloat16, enabled=autocast_enabled):
             t0 = time.time()
 
             # xvec projection - autocast handles dtype automatically
