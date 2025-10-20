@@ -46,8 +46,16 @@ class T3(nn.Module):
             hp = T3Config.english_only()  # Default to English-only config for backward compatibility
         super().__init__()
         self.hp = hp
-        self.cfg = LlamaConfig(**LLAMA_CONFIGS[hp.llama_config_name])
+        # Enable Flash Attention 2 for 2-3x speedup on attention operations
+        llama_config_dict = LLAMA_CONFIGS[hp.llama_config_name].copy()
+        llama_config_dict['attn_implementation'] = 'flash_attention_2'
+        llama_config_dict['use_cache'] = True  # Enable KV cache for generation
+        self.cfg = LlamaConfig(**llama_config_dict)
         self.tfmr = LlamaModel(self.cfg)
+
+        # Keep model in FP32 - autocast will handle BF16 conversion during inference
+        # Flash Attention 2 works with autocast, no manual dtype conversion needed
+
         self.dim = self.cfg.hidden_size
         self.deepspeed_patch_applied = False
 

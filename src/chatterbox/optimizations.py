@@ -53,7 +53,14 @@ class PerformanceOptimizer:
         # Enable cuDNN for better performance
         torch.backends.cudnn.enabled = True
 
-        logger.info("CUDA optimizations enabled: TF32, cuDNN benchmark")
+        # Enable non-deterministic algorithms for maximum speed
+        torch.backends.cudnn.deterministic = False
+        torch.use_deterministic_algorithms(False)
+
+        # Optimize memory allocator
+        torch.cuda.memory.set_per_process_memory_fraction(0.95)
+
+        logger.info("CUDA optimizations enabled: TF32 precision, cuDNN benchmark, memory optimization")
 
     def optimize_model(
         self,
@@ -72,10 +79,10 @@ class PerformanceOptimizer:
         Returns:
             Optimized model
         """
-        # Convert to BF16 if enabled
-        if self.enable_bf16 and model.training is False:
-            model = model.to(dtype=torch.bfloat16)
-            logger.info(f"Converted {model.__class__.__name__} to BF16")
+        # Keep model in FP32 - autocast will handle BF16 conversion during inference
+        # Manual BF16 conversion is incompatible with torch.compile + autocast
+        if self.enable_bf16:
+            logger.info(f"BF16 enabled for {model.__class__.__name__} - using autocast (model kept in FP32)")
 
         # Apply torch.compile if enabled
         if self.enable_compile:
@@ -171,11 +178,36 @@ def optimize_hifigan_inference(hifigan, enable_bf16: bool = True, enable_compile
     # Replace inference method
     hifigan.inference = optimized_inference
 
-    # Optionally compile sub-modules (disabled for now due to complexity)
+    # Compile vocoder sub-modules for maximum performance
     if enable_compile:
-        # Note: Disabling torch.compile for vocoder sub-modules as they're complex
-        # and may cause graph breaks. The performance gain is minimal vs risk.
-        logger.info("[VOCODER] torch.compile disabled for vocoder (too complex, minimal gain)")
+        try:
+            # Compile f0 predictor
+            hifigan.f0_predictor = torch.compile(
+                hifigan.f0_predictor,
+                mode="max-autotune",
+                fullgraph=True
+            )
+            logger.info("[VOCODER] Compiled f0_predictor with max-autotune")
+        except Exception as e:
+            logger.warning(f"[VOCODER] Failed to compile f0_predictor: {e}")
+
+        try:
+            # Compile decoder (main bottleneck)
+            hifigan.decode = torch.compile(
+                hifigan.decode,
+                mode="max-autotune",
+                fullgraph=False
+            )
+            logger.info("[VOCODER] Compiled decode with max-autotune")
+        except Exception as e:
+            logger.warning(f"[VOCODER] Failed to compile decode: {e}")
+
+    # Optimize memory layout
+    try:
+        hifigan = hifigan.to(memory_format=torch.channels_last)
+        logger.info("[VOCODER] Converted to channels_last memory format")
+    except Exception as e:
+        logger.warning(f"[VOCODER] Failed to convert memory format: {e}")
 
     logger.info("[VOCODER] Optimization complete")
     return hifigan
@@ -280,46 +312,56 @@ def optimize_flow_decoder(flow_model, n_timesteps: int = 4, enable_bf16: bool = 
     # Replace inference method
     flow_model.inference = optimized_inference
 
-    # Optionally compile decoder (disabled for now due to complexity)
+    # Compile flow decoder for additional performance
     if enable_compile:
-        # Note: Disabling torch.compile for flow decoder as it's complex
-        # and may cause graph breaks. BF16 + reduced timesteps give sufficient speedup.
-        logger.info(f"[FLOW] torch.compile disabled for flow decoder (too complex)")
+        try:
+            flow_model.decoder = torch.compile(
+                flow_model.decoder,
+                mode="reduce-overhead",
+                fullgraph=False
+            )
+            logger.info(f"[FLOW] Compiled decoder with reduce-overhead mode")
+        except Exception as e:
+            logger.warning(f"[FLOW] Failed to compile decoder: {e}")
 
     return flow_model
 
 
 def optimize_t3_model(t3_model, enable_bf16: bool = True, enable_compile: bool = True):
     """
-    Optimize T3 (LLaMA-based) model for faster inference
+    Optimize T3 (LLaMA-based) model for faster inference with autocast
 
     Args:
         t3_model: T3 model instance
-        enable_bf16: Enable BF16 mixed precision
+        enable_bf16: Enable BF16 mixed precision via autocast
         enable_compile: Enable torch.compile
     """
     if not hasattr(t3_model, '_original_inference'):
         t3_model._original_inference = t3_model.inference
 
-    # Wrap inference with timing
+    # Wrap inference with timing and autocast
     original_inference = t3_model.inference
 
-    def timed_inference(*args, **kwargs):
+    def timed_inference_with_autocast(*args, **kwargs):
         t_start = time.time()
-        result = original_inference(*args, **kwargs)
+
+        # Use autocast context for automatic BF16 conversion
+        autocast_enabled = enable_bf16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+        with torch.amp.autocast('cuda', dtype=torch.bfloat16, enabled=autocast_enabled):
+            result = original_inference(*args, **kwargs)
+
         t_end = time.time()
         logger.info(f"[T3] Inference: {(t_end-t_start)*1000:.1f}ms")
         return result
 
-    t3_model.inference = timed_inference
+    t3_model.inference = timed_inference_with_autocast
 
-    # Optionally compile
+    # NOTE: torch.compile disabled for T3 transformer due to CUDA graphs incompatibility
+    # T3 uses autoregressive generation with KV cache, which is inherently dynamic
+    # CUDA graphs (used by torch.compile) cause tensor overwrite errors in this scenario
+    # The autocast wrapper provides sufficient speedup without compilation issues
     if enable_compile:
-        try:
-            # Note: LLaMA models are complex, compile carefully
-            logger.info("[T3] Model compilation skipped (LLaMA is complex)")
-        except Exception as e:
-            logger.warning(f"[T3] Failed to compile: {e}")
+        logger.info("[T3] torch.compile disabled for T3 transformer (incompatible with autoregressive generation)")
 
     return t3_model
 
