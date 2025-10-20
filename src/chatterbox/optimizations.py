@@ -113,67 +113,55 @@ def optimize_hifigan_inference(hifigan, enable_bf16: bool = True, enable_compile
 
     Args:
         hifigan: HiFTGenerator instance
-        enable_bf16: Enable BF16 mixed precision
+        enable_bf16: Enable BF16 mixed precision via autocast
         enable_compile: Enable torch.compile
     """
     optimizer = PerformanceOptimizer(enable_bf16=enable_bf16, enable_compile=enable_compile)
 
-    # Convert model parameters to BF16 if enabled (excluding buffers)
-    if enable_bf16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported():
-        for name, param in hifigan.named_parameters():
-            if param.dtype == torch.float32:
-                param.data = param.data.to(dtype=torch.bfloat16)
-        logger.info("[VOCODER] Converted model parameters to BF16")
+    # Keep model in FP32 - autocast will handle conversion
+    logger.info("[VOCODER] Model kept in FP32, will use autocast for BF16")
 
     # Store original inference
     if not hasattr(hifigan, '_original_inference'):
         hifigan._original_inference = hifigan.inference
 
-    # Create optimized inference with logging
+    # Create optimized inference with logging and autocast
     @torch.inference_mode()
     def optimized_inference(speech_feat: torch.Tensor, cache_source: torch.Tensor = None):
-        """Optimized vocoder inference with timing logs"""
+        """Optimized vocoder inference with timing logs and autocast"""
         if cache_source is None:
             cache_source = torch.zeros(1, 1, 0).to(speech_feat.device)
 
         t_start = time.time()
 
-        # Get model dtype from first parameter and convert inputs to match
-        try:
-            model_dtype = next(iter(hifigan.parameters())).dtype
-            if speech_feat.dtype != model_dtype:
-                speech_feat = speech_feat.to(dtype=model_dtype)
-            if cache_source.dtype != model_dtype and cache_source.numel() > 0:
-                cache_source = cache_source.to(dtype=model_dtype)
-        except StopIteration:
-            # No parameters, keep original dtype
-            pass
+        # Use autocast context for automatic BF16 conversion
+        autocast_enabled = enable_bf16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+        with torch.cuda.amp.autocast(dtype=torch.bfloat16, enabled=autocast_enabled):
+            # mel->f0
+            t0 = time.time()
+            f0 = hifigan.f0_predictor(speech_feat)
+            t1 = time.time()
+            logger.debug(f"[VOCODER] F0 prediction: {(t1-t0)*1000:.1f}ms")
 
-        # mel->f0
-        t0 = time.time()
-        f0 = hifigan.f0_predictor(speech_feat)
-        t1 = time.time()
-        logger.debug(f"[VOCODER] F0 prediction: {(t1-t0)*1000:.1f}ms")
+            # f0->source
+            s = hifigan.f0_upsamp(f0[:, None]).transpose(1, 2)
+            s, _, _ = hifigan.m_source(s)
+            s = s.transpose(1, 2)
+            t2 = time.time()
+            logger.debug(f"[VOCODER] Source generation: {(t2-t1)*1000:.1f}ms")
 
-        # f0->source
-        s = hifigan.f0_upsamp(f0[:, None]).transpose(1, 2)
-        s, _, _ = hifigan.m_source(s)
-        s = s.transpose(1, 2)
-        t2 = time.time()
-        logger.debug(f"[VOCODER] Source generation: {(t2-t1)*1000:.1f}ms")
+            # use cache_source to avoid glitch
+            if cache_source.shape[2] != 0:
+                s[:, :, :cache_source.shape[2]] = cache_source
 
-        # use cache_source to avoid glitch
-        if cache_source.shape[2] != 0:
-            s[:, :, :cache_source.shape[2]] = cache_source
+            # decode (mel + source -> waveform)
+            generated_speech = hifigan.decode(x=speech_feat, s=s)
+            t3 = time.time()
+            logger.debug(f"[VOCODER] Decode: {(t3-t2)*1000:.1f}ms")
 
-        # decode (mel + source -> waveform)
-        generated_speech = hifigan.decode(x=speech_feat, s=s)
-        t3 = time.time()
-        logger.debug(f"[VOCODER] Decode: {(t3-t2)*1000:.1f}ms")
-
-        # Convert back to FP32 for compatibility
-        if generated_speech.dtype == torch.bfloat16:
-            generated_speech = generated_speech.to(dtype=torch.float32)
+        # Convert back to FP32 for compatibility after exiting autocast
+        generated_speech = generated_speech.float()
+        s = s.float()
 
         t_end = time.time()
         logger.info(f"[VOCODER] Total inference: {(t_end-t_start)*1000:.1f}ms")
@@ -183,40 +171,11 @@ def optimize_hifigan_inference(hifigan, enable_bf16: bool = True, enable_compile
     # Replace inference method
     hifigan.inference = optimized_inference
 
-    # Optionally compile sub-modules
+    # Optionally compile sub-modules (disabled for now due to complexity)
     if enable_compile:
-        try:
-            # Compile F0 predictor
-            hifigan.f0_predictor = torch.compile(
-                hifigan.f0_predictor,
-                mode="reduce-overhead",
-                fullgraph=False
-            )
-            logger.info("[VOCODER] Compiled F0 predictor")
-        except Exception as e:
-            logger.warning(f"[VOCODER] Failed to compile F0 predictor: {e}")
-
-        try:
-            # Compile source module
-            hifigan.m_source = torch.compile(
-                hifigan.m_source,
-                mode="reduce-overhead",
-                fullgraph=False
-            )
-            logger.info("[VOCODER] Compiled source module")
-        except Exception as e:
-            logger.warning(f"[VOCODER] Failed to compile source module: {e}")
-
-        try:
-            # Compile decoder
-            hifigan.decode = torch.compile(
-                hifigan.decode,
-                mode="reduce-overhead",
-                fullgraph=False
-            )
-            logger.info("[VOCODER] Compiled decode module")
-        except Exception as e:
-            logger.warning(f"[VOCODER] Failed to compile decode: {e}")
+        # Note: Disabling torch.compile for vocoder sub-modules as they're complex
+        # and may cause graph breaks. The performance gain is minimal vs risk.
+        logger.info("[VOCODER] torch.compile disabled for vocoder (too complex, minimal gain)")
 
     logger.info("[VOCODER] Optimization complete")
     return hifigan
@@ -224,24 +183,19 @@ def optimize_hifigan_inference(hifigan, enable_bf16: bool = True, enable_compile
 
 def optimize_flow_decoder(flow_model, n_timesteps: int = 4, enable_bf16: bool = True, enable_compile: bool = True):
     """
-    Optimize flow matching decoder for faster inference
+    Optimize flow matching decoder for faster inference using torch.autocast
 
     Args:
         flow_model: CausalMaskedDiffWithXvec instance
         n_timesteps: Number of timesteps (reduced from 10)
-        enable_bf16: Enable BF16 mixed precision
+        enable_bf16: Enable BF16 mixed precision via autocast
         enable_compile: Enable torch.compile
     """
     import torch.nn.functional as F
     from chatterbox.models.s3gen.utils.mask import make_pad_mask
 
-    # Convert model parameters to BF16 if enabled (skip embedding layers)
-    if enable_bf16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported():
-        for name, param in flow_model.named_parameters():
-            # Skip embedding layers as they should stay in their original dtype
-            if 'embedding' not in name.lower() and param.dtype == torch.float32:
-                param.data = param.data.to(dtype=torch.bfloat16)
-        logger.info("[FLOW] Converted model parameters to BF16 (excluding embeddings)")
+    # Keep model in FP32 - autocast will handle conversion
+    logger.info("[FLOW] Model kept in FP32, will use autocast for BF16")
 
     if not hasattr(flow_model, '_original_inference'):
         flow_model._original_inference = flow_model.inference
@@ -257,74 +211,65 @@ def optimize_flow_decoder(flow_model, n_timesteps: int = 4, enable_bf16: bool = 
         embedding,
         finalize,
     ):
-        """Optimized flow inference with reduced timesteps"""
+        """Optimized flow inference with reduced timesteps and autocast"""
         t_start = time.time()
-
-        # Get model dtype from first parameter
-        try:
-            model_dtype = next(iter(flow_model.parameters())).dtype
-            # Convert inputs to match model dtype
-            if prompt_feat.dtype != model_dtype:
-                prompt_feat = prompt_feat.to(dtype=model_dtype)
-            if embedding.dtype != model_dtype:
-                embedding = embedding.to(dtype=model_dtype)
-        except StopIteration:
-            # No parameters, keep original dtype
-            pass
 
         assert token.shape[0] == 1
 
-        t0 = time.time()
+        # Use autocast context for automatic BF16 conversion
+        autocast_enabled = enable_bf16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+        with torch.cuda.amp.autocast(dtype=torch.bfloat16, enabled=autocast_enabled):
+            t0 = time.time()
 
-        # xvec projection
-        embedding = F.normalize(embedding, dim=1)
-        embedding = flow_model.spk_embed_affine_layer(embedding)
+            # xvec projection - autocast handles dtype automatically
+            embedding = F.normalize(embedding, dim=1)
+            embedding = flow_model.spk_embed_affine_layer(embedding)
 
-        # concat text and prompt_text
-        token, token_len = torch.concat([prompt_token, token], dim=1), prompt_token_len + token_len
-        mask = (~make_pad_mask(token_len)).unsqueeze(-1).to(embedding)
-        token = flow_model.input_embedding(
-            torch.clamp(token, min=0, max=flow_model.input_embedding.num_embeddings-1)
-        ) * mask
+            # concat text and prompt_text
+            token, token_len = torch.concat([prompt_token, token], dim=1), prompt_token_len + token_len
+            mask = (~make_pad_mask(token_len)).unsqueeze(-1).to(embedding)
+            token = flow_model.input_embedding(
+                torch.clamp(token, min=0, max=flow_model.input_embedding.num_embeddings-1)
+            ) * mask
 
-        t1 = time.time()
-        logger.debug(f"[FLOW] Embedding: {(t1-t0)*1000:.1f}ms")
+            t1 = time.time()
+            logger.debug(f"[FLOW] Embedding: {(t1-t0)*1000:.1f}ms")
 
-        # text encode
-        h, h_lengths = flow_model.encoder(token, token_len)
-        if finalize is False:
-            h = h[:, :-flow_model.pre_lookahead_len * flow_model.token_mel_ratio]
-        mel_len1, mel_len2 = prompt_feat.shape[1], h.shape[1] - prompt_feat.shape[1]
-        h = flow_model.encoder_proj(h)
+            # text encode
+            h, h_lengths = flow_model.encoder(token, token_len)
+            if finalize is False:
+                h = h[:, :-flow_model.pre_lookahead_len * flow_model.token_mel_ratio]
+            mel_len1, mel_len2 = prompt_feat.shape[1], h.shape[1] - prompt_feat.shape[1]
+            h = flow_model.encoder_proj(h)
 
-        t2 = time.time()
-        logger.debug(f"[FLOW] Encoding: {(t2-t1)*1000:.1f}ms")
+            t2 = time.time()
+            logger.debug(f"[FLOW] Encoding: {(t2-t1)*1000:.1f}ms")
 
-        # get conditions
-        conds = torch.zeros([1, mel_len1 + mel_len2, flow_model.output_size], device=token.device).to(h.dtype)
-        conds[:, :mel_len1] = prompt_feat
-        conds = conds.transpose(1, 2)
+            # get conditions
+            conds = torch.zeros([1, mel_len1 + mel_len2, flow_model.output_size], device=token.device).to(h.dtype)
+            conds[:, :mel_len1] = prompt_feat
+            conds = conds.transpose(1, 2)
 
-        mask = (~make_pad_mask(torch.tensor([mel_len1 + mel_len2]))).to(h)
+            mask = (~make_pad_mask(torch.tensor([mel_len1 + mel_len2]))).to(h)
 
-        t3 = time.time()
+            t3 = time.time()
 
-        # CRITICAL: Use reduced n_timesteps
-        feat, _ = flow_model.decoder(
-            mu=h.transpose(1, 2).contiguous(),
-            mask=mask.unsqueeze(1),
-            spks=embedding,
-            cond=conds,
-            n_timesteps=n_timesteps  # REDUCED from 10
-        )
+            # CRITICAL: Use reduced n_timesteps
+            feat, _ = flow_model.decoder(
+                mu=h.transpose(1, 2).contiguous(),
+                mask=mask.unsqueeze(1),
+                spks=embedding,
+                cond=conds,
+                n_timesteps=n_timesteps  # REDUCED from 10
+            )
 
-        t4 = time.time()
-        logger.info(f"[FLOW] Decoder ({n_timesteps} steps): {(t4-t3)*1000:.1f}ms")
+            t4 = time.time()
+            logger.info(f"[FLOW] Decoder ({n_timesteps} steps): {(t4-t3)*1000:.1f}ms")
 
-        feat = feat[:, :, mel_len1:]
-        assert feat.shape[2] == mel_len2
+            feat = feat[:, :, mel_len1:]
+            assert feat.shape[2] == mel_len2
 
-        # Convert back to FP32
+        # Convert back to FP32 after exiting autocast
         feat = feat.float()
 
         t_end = time.time()
@@ -335,17 +280,11 @@ def optimize_flow_decoder(flow_model, n_timesteps: int = 4, enable_bf16: bool = 
     # Replace inference method
     flow_model.inference = optimized_inference
 
-    # Optionally compile decoder
+    # Optionally compile decoder (disabled for now due to complexity)
     if enable_compile:
-        try:
-            flow_model.decoder = torch.compile(
-                flow_model.decoder,
-                mode="reduce-overhead",
-                fullgraph=False
-            )
-            logger.info(f"[FLOW] Compiled decoder with n_timesteps={n_timesteps}")
-        except Exception as e:
-            logger.warning(f"[FLOW] Failed to compile decoder: {e}")
+        # Note: Disabling torch.compile for flow decoder as it's complex
+        # and may cause graph breaks. BF16 + reduced timesteps give sufficient speedup.
+        logger.info(f"[FLOW] torch.compile disabled for flow decoder (too complex)")
 
     return flow_model
 
