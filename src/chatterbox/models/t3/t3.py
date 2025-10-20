@@ -50,11 +50,13 @@ class T3(nn.Module):
         llama_config_dict = LLAMA_CONFIGS[hp.llama_config_name].copy()
         llama_config_dict['attn_implementation'] = 'flash_attention_2'
         llama_config_dict['use_cache'] = True  # Enable KV cache for generation
+        llama_config_dict['torch_dtype'] = torch.bfloat16  # BF16 for Flash Attention 2 compatibility
         self.cfg = LlamaConfig(**llama_config_dict)
+        # Initialize model - config's torch_dtype ensures BF16 initialization
         self.tfmr = LlamaModel(self.cfg)
 
-        # Keep model in FP32 - autocast will handle BF16 conversion during inference
-        # Flash Attention 2 works with autocast, no manual dtype conversion needed
+        # Model initialized in BF16 - Flash Attention 2 requires float16/bfloat16
+        # Autocast will maintain BF16 precision during inference
 
         self.dim = self.cfg.hidden_size
         self.deepspeed_patch_applied = False
