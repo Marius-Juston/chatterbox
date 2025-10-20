@@ -118,6 +118,13 @@ def optimize_hifigan_inference(hifigan, enable_bf16: bool = True, enable_compile
     """
     optimizer = PerformanceOptimizer(enable_bf16=enable_bf16, enable_compile=enable_compile)
 
+    # Convert model parameters to BF16 if enabled (excluding buffers)
+    if enable_bf16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+        for name, param in hifigan.named_parameters():
+            if param.dtype == torch.float32:
+                param.data = param.data.to(dtype=torch.bfloat16)
+        logger.info("[VOCODER] Converted model parameters to BF16")
+
     # Store original inference
     if not hasattr(hifigan, '_original_inference'):
         hifigan._original_inference = hifigan.inference
@@ -131,10 +138,16 @@ def optimize_hifigan_inference(hifigan, enable_bf16: bool = True, enable_compile
 
         t_start = time.time()
 
-        # Convert to BF16 if enabled
-        if enable_bf16 and speech_feat.dtype != torch.bfloat16:
-            speech_feat = speech_feat.to(dtype=torch.bfloat16)
-            cache_source = cache_source.to(dtype=torch.bfloat16)
+        # Get model dtype from first parameter and convert inputs to match
+        try:
+            model_dtype = next(iter(hifigan.parameters())).dtype
+            if speech_feat.dtype != model_dtype:
+                speech_feat = speech_feat.to(dtype=model_dtype)
+            if cache_source.dtype != model_dtype and cache_source.numel() > 0:
+                cache_source = cache_source.to(dtype=model_dtype)
+        except StopIteration:
+            # No parameters, keep original dtype
+            pass
 
         # mel->f0
         t0 = time.time()
@@ -222,6 +235,14 @@ def optimize_flow_decoder(flow_model, n_timesteps: int = 4, enable_bf16: bool = 
     import torch.nn.functional as F
     from chatterbox.models.s3gen.utils.mask import make_pad_mask
 
+    # Convert model parameters to BF16 if enabled (skip embedding layers)
+    if enable_bf16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+        for name, param in flow_model.named_parameters():
+            # Skip embedding layers as they should stay in their original dtype
+            if 'embedding' not in name.lower() and param.dtype == torch.float32:
+                param.data = param.data.to(dtype=torch.bfloat16)
+        logger.info("[FLOW] Converted model parameters to BF16 (excluding embeddings)")
+
     if not hasattr(flow_model, '_original_inference'):
         flow_model._original_inference = flow_model.inference
 
@@ -239,16 +260,17 @@ def optimize_flow_decoder(flow_model, n_timesteps: int = 4, enable_bf16: bool = 
         """Optimized flow inference with reduced timesteps"""
         t_start = time.time()
 
-        # Convert to BF16 if enabled
-        if enable_bf16:
-            if prompt_feat.dtype != torch.bfloat16:
-                prompt_feat = prompt_feat.to(dtype=torch.bfloat16)
-            if embedding.dtype != torch.bfloat16:
-                embedding = embedding.to(dtype=torch.bfloat16)
-
-        if flow_model.fp16 is True:
-            prompt_feat = prompt_feat.half()
-            embedding = embedding.half()
+        # Get model dtype from first parameter
+        try:
+            model_dtype = next(iter(flow_model.parameters())).dtype
+            # Convert inputs to match model dtype
+            if prompt_feat.dtype != model_dtype:
+                prompt_feat = prompt_feat.to(dtype=model_dtype)
+            if embedding.dtype != model_dtype:
+                embedding = embedding.to(dtype=model_dtype)
+        except StopIteration:
+            # No parameters, keep original dtype
+            pass
 
         assert token.shape[0] == 1
 

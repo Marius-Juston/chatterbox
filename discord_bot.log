@@ -1,0 +1,72 @@
+2025-10-19 20:25:07,001 - handlers.vad_handler - INFO - Attempting to load Silero VAD via torch.hub...
+2025-10-19 20:25:07,152 - handlers.vad_handler - INFO - Silero VAD loaded successfully.
+2025-10-19 20:25:07,152 - handlers.stt_handler - INFO - Loading Whisper model 'medium.en' on device 'cuda:0'
+2025-10-19 20:25:08,955 - handlers.stt_handler - INFO - Whisper model loaded successfully
+2025-10-19 20:25:08,956 - handlers.stt_handler - INFO - MultiUserSTTHandler initialized (max_concurrent=4)
+2025-10-19 20:25:08,956 - handlers.tts_handler - INFO - Initializing Chatterbox TTS with 3 devices
+2025-10-19 20:25:08,956 - handlers.tts_handler - INFO - Max parallel chunks: 3
+2025-10-19 20:25:08,956 - handlers.tts_handler - INFO - Loading model 1/3 on cuda:1
+2025-10-19 20:25:17,212 - root - INFO - input frame rate=25
+2025-10-19 20:25:18,290 - handlers.tts_handler - INFO - Model loaded on cuda:1
+2025-10-19 20:25:18,290 - handlers.tts_handler - INFO - Loading model 2/3 on cuda:2
+2025-10-19 20:25:25,585 - root - INFO - input frame rate=25
+2025-10-19 20:25:26,701 - handlers.tts_handler - INFO - Model loaded on cuda:2
+2025-10-19 20:25:26,701 - handlers.tts_handler - INFO - Loading model 3/3 on cuda:3
+2025-10-19 20:25:34,060 - root - INFO - input frame rate=25
+2025-10-19 20:25:34,997 - handlers.tts_handler - INFO - Model loaded on cuda:3
+2025-10-19 20:25:35,019 - handlers.tts_handler - INFO - Created GPU resampler on cuda:1: 24000Hz -> 48000Hz
+2025-10-19 20:25:35,019 - handlers.tts_handler - INFO - Created GPU resampler on cuda:2: 24000Hz -> 48000Hz
+2025-10-19 20:25:35,020 - handlers.tts_handler - INFO - Created GPU resampler on cuda:3: 24000Hz -> 48000Hz
+2025-10-19 20:25:35,020 - handlers.tts_handler - INFO - Chatterbox TTS handler initialized successfully with GPU acceleration
+2025-10-19 20:25:35,020 - chatterbox.optimizations - INFO - [CHATTERBOX] Starting comprehensive optimization...
+2025-10-19 20:25:35,020 - chatterbox.optimizations - INFO - [T3] Model compilation skipped (LLaMA is complex)
+2025-10-19 20:25:35,823 - chatterbox.optimizations - INFO - [FLOW] Compiled decoder with n_timesteps=4
+2025-10-19 20:25:35,823 - chatterbox.optimizations - INFO - CUDA optimizations enabled: TF32, cuDNN benchmark
+2025-10-19 20:25:35,823 - chatterbox.optimizations - INFO - PerformanceOptimizer initialized:
+2025-10-19 20:25:35,823 - chatterbox.optimizations - INFO -   - BF16: True
+2025-10-19 20:25:35,823 - chatterbox.optimizations - INFO -   - torch.compile: True
+2025-10-19 20:25:35,825 - chatterbox.optimizations - INFO - [VOCODER] Compiled F0 predictor
+2025-10-19 20:25:35,826 - chatterbox.optimizations - INFO - [VOCODER] Compiled source module
+2025-10-19 20:25:35,827 - chatterbox.optimizations - INFO - [VOCODER] Compiled decode module
+2025-10-19 20:25:35,827 - chatterbox.optimizations - INFO - [VOCODER] Optimization complete
+2025-10-19 20:25:35,827 - chatterbox.optimizations - INFO - [S3GEN] Complete optimization applied (n_timesteps=4)
+2025-10-19 20:25:35,828 - chatterbox.optimizations - INFO - [CHATTERBOX] Watermarking disabled
+2025-10-19 20:25:35,828 - chatterbox.optimizations - INFO - [CHATTERBOX] Optimization complete!
+2025-10-19 20:25:35,828 - handlers.tts_handler_optimized - INFO - [TTS-OPT] Applied comprehensive optimizations to model on cuda:1
+2025-10-19 20:25:35,828 - chatterbox.optimizations - INFO - [CHATTERBOX] Starting comprehensive optimization...
+2025-10-19 20:25:35,828 - chatterbox.optimizations - INFO - [T3] Model compilation skipped (LLaMA is complex)
+2025-10-19 20:25:35,829 - chatterbox.optimizations - INFO - [FLOW] Compiled decoder with n_timesteps=4
+2025-10-19 20:25:35,829 - chatterbox.optimizations - INFO - CUDA optimizations enabled: TF32, cuDNN benchmark
+2025-10-19 20:25:35,829 - chatterbox.optimizations - INFO - PerformanceOptimizer initialized:
+2025-10-19 20:25:35,829 - chatterbox.optimizations - INFO -   - BF16: True
+2025-10-19 20:25:35,829 - chatterbox.optimizations - INFO -   - torch.compile: True
+2025-10-19 20:25:35,831 - chatterbox.optimizations - INFO - [VOCODER] Compiled F0 predictor
+2025-10-19 20:25:35,832 - chatterbox.optimizations - INFO - [VOCODER] Compiled source module
+2025-10-19 20:25:35,833 - chatterbox.optimizations - INFO - [VOCODER] Compiled decode module
+2025-10-19 20:25:35,833 - chatterbox.optimizations - INFO - [VOCODER] Optimization complete
+2025-10-19 20:25:35,833 - chatterbox.optimizations - INFO - [S3GEN] Complete optimization applied (n_timesteps=4)
+2025-10-19 20:25:35,833 - chatterbox.optimizations - INFO - [CHATTERBOX] Watermarking disabled
+2025-10-19 20:25:35,834 - chatterbox.optimizations - INFO - [CHATTERBOX] Optimization complete!
+2025-10-19 20:25:35,834 - handlers.tts_handler_optimized - INFO - [TTS-OPT] Applied comprehensive optimizations to model on cuda:2
+2025-10-19 20:25:35,834 - chatterbox.optimizations - INFO - [CHATTERBOX] Starting comprehensive optimization...
+2025-10-19 20:25:35,834 - chatterbox.optimizations - INFO - [T3] Model compilation skipped (LLaMA is complex)
+2025-10-19 20:25:35,835 - chatterbox.optimizations - INFO - [FLOW] Compiled decoder with n_timesteps=4
+2025-10-19 20:25:35,835 - chatterbox.optimizations - INFO - CUDA optimizations enabled: TF32, cuDNN benchmark
+2025-10-19 20:25:35,835 - chatterbox.optimizations - INFO - PerformanceOptimizer initialized:
+2025-10-19 20:25:35,835 - chatterbox.optimizations - INFO -   - BF16: True
+2025-10-19 20:25:35,835 - chatterbox.optimizations - INFO -   - torch.compile: True
+2025-10-19 20:25:35,836 - chatterbox.optimizations - INFO - [VOCODER] Compiled F0 predictor
+2025-10-19 20:25:35,838 - chatterbox.optimizations - INFO - [VOCODER] Compiled source module
+2025-10-19 20:25:35,839 - chatterbox.optimizations - INFO - [VOCODER] Compiled decode module
+2025-10-19 20:25:35,839 - chatterbox.optimizations - INFO - [VOCODER] Optimization complete
+2025-10-19 20:25:35,839 - chatterbox.optimizations - INFO - [S3GEN] Complete optimization applied (n_timesteps=4)
+2025-10-19 20:25:35,839 - chatterbox.optimizations - INFO - [CHATTERBOX] Watermarking disabled
+2025-10-19 20:25:35,839 - chatterbox.optimizations - INFO - [CHATTERBOX] Optimization complete!
+2025-10-19 20:25:35,839 - handlers.tts_handler_optimized - INFO - [TTS-OPT] Applied comprehensive optimizations to model on cuda:3
+2025-10-19 20:25:35,839 - handlers.tts_handler_optimized - INFO - [TTS-OPT] Optimized streaming handler initialized:
+2025-10-19 20:25:35,839 - handlers.tts_handler_optimized - INFO -   - n_timesteps: 4
+2025-10-19 20:25:35,839 - handlers.tts_handler_optimized - INFO -   - BF16: True
+2025-10-19 20:25:35,839 - handlers.tts_handler_optimized - INFO -   - torch.compile: True
+2025-10-19 20:25:35,839 - handlers.tts_handler_optimized - INFO -   - Watermark disabled: True
+2025-10-19 20:25:35,839 - handlers.conversation_manager - INFO - ConversationManager initialized (timeout=2.0s)
+2025-10-19 20:25:35,840 - utils.performance - INFO - PerformanceMonitor initialized
