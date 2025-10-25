@@ -1,50 +1,49 @@
+import os
 from dataclasses import dataclass
 from pathlib import Path
-import os
 
 import librosa
-import torch
 import perth
+import torch
 import torch.nn.functional as F
-from safetensors.torch import load_file as load_safetensors
 from huggingface_hub import snapshot_download
+from safetensors.torch import load_file as load_safetensors
 
-from .models.t3 import T3
-from .models.t3.modules.t3_config import T3Config
-from .models.s3tokenizer import S3_SR, drop_invalid_tokens
 from .models.s3gen import S3GEN_SR, S3Gen
+from .models.s3tokenizer import S3_SR, drop_invalid_tokens
+from .models.t3 import T3
+from .models.t3.modules.cond_enc import T3Cond
+from .models.t3.modules.t3_config import T3Config
 from .models.tokenizers import MTLTokenizer
 from .models.voice_encoder import VoiceEncoder
-from .models.t3.modules.cond_enc import T3Cond
-
 
 REPO_ID = "ResembleAI/chatterbox"
 
 # Supported languages for the multilingual model
 SUPPORTED_LANGUAGES = {
-  "ar": "Arabic",
-  "da": "Danish",
-  "de": "German",
-  "el": "Greek",
-  "en": "English",
-  "es": "Spanish",
-  "fi": "Finnish",
-  "fr": "French",
-  "he": "Hebrew",
-  "hi": "Hindi",
-  "it": "Italian",
-  "ja": "Japanese",
-  "ko": "Korean",
-  "ms": "Malay",
-  "nl": "Dutch",
-  "no": "Norwegian",
-  "pl": "Polish",
-  "pt": "Portuguese",
-  "ru": "Russian",
-  "sv": "Swedish",
-  "sw": "Swahili",
-  "tr": "Turkish",
-  "zh": "Chinese",
+    "ar": "Arabic",
+    "da": "Danish",
+    "de": "German",
+    "el": "Greek",
+    "en": "English",
+    "es": "Spanish",
+    "fi": "Finnish",
+    "fr": "French",
+    "he": "Hebrew",
+    "hi": "Hindi",
+    "it": "Italian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "ms": "Malay",
+    "nl": "Dutch",
+    "no": "Norwegian",
+    "pl": "Polish",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "sv": "Swedish",
+    "sw": "Swahili",
+    "tr": "Turkish",
+    "zh": "Chinese",
 }
 
 
@@ -83,7 +82,7 @@ def punc_norm(text: str) -> str:
 
     # Add full stop if no ending punc
     text = text.rstrip(" ")
-    sentence_enders = {".", "!", "?", "-", ",","、","，","。","？","！"}
+    sentence_enders = {".", "!", "?", "-", ",", "、", "，", "。", "？", "！"}
     if not any(text.endswith(p) for p in sentence_enders):
         text += "."
 
@@ -135,13 +134,13 @@ class ChatterboxMultilingualTTS:
     DEC_COND_LEN = 10 * S3GEN_SR
 
     def __init__(
-        self,
-        t3: T3,
-        s3gen: S3Gen,
-        ve: VoiceEncoder,
-        tokenizer: MTLTokenizer,
-        device: str,
-        conds: Conditionals = None,
+            self,
+            t3: T3,
+            s3gen: S3Gen,
+            ve: VoiceEncoder,
+            tokenizer: MTLTokenizer,
+            device: str,
+            conds: Conditionals = None,
     ):
         self.sr = S3GEN_SR  # sample rate of synthesized audio
         self.t3 = t3
@@ -196,13 +195,14 @@ class ChatterboxMultilingualTTS:
             snapshot_download(
                 repo_id=REPO_ID,
                 repo_type="model",
-                revision="main", 
-                allow_patterns=["ve.pt", "t3_mtl23ls_v2.safetensors", "s3gen.pt", "grapheme_mtl_merged_expanded_v1.json", "conds.pt", "Cangjie5_TC.json"],
+                revision="main",
+                allow_patterns=["ve.pt", "t3_mtl23ls_v2.safetensors", "s3gen.pt",
+                                "grapheme_mtl_merged_expanded_v1.json", "conds.pt", "Cangjie5_TC.json"],
                 token=os.getenv("HF_TOKEN"),
             )
         )
         return cls.from_local(ckpt_dir, device)
-    
+
     def prepare_conditionals(self, wav_fpath, exaggeration=0.5):
         ## Load reference wav
         s3gen_ref_wav, _sr = librosa.load(wav_fpath, sr=S3GEN_SR)
@@ -231,16 +231,16 @@ class ChatterboxMultilingualTTS:
         self.conds = Conditionals(t3_cond, s3gen_ref_dict)
 
     def generate(
-        self,
-        text,
-        language_id,
-        audio_prompt_path=None,
-        exaggeration=0.5,
-        cfg_weight=0.5,
-        temperature=0.8,
-        repetition_penalty=2.0,
-        min_p=0.05,
-        top_p=1.0,
+            self,
+            text,
+            language_id,
+            audio_prompt_path=None,
+            exaggeration=0.5,
+            cfg_weight=0.5,
+            temperature=0.8,
+            repetition_penalty=2.0,
+            min_p=0.05,
+            top_p=1.0,
     ):
         # Validate language_id
         if language_id and language_id.lower() not in SUPPORTED_LANGUAGES:
@@ -249,7 +249,7 @@ class ChatterboxMultilingualTTS:
                 f"Unsupported language_id '{language_id}'. "
                 f"Supported languages: {supported_langs}"
             )
-        
+
         if audio_prompt_path:
             self.prepare_conditionals(audio_prompt_path, exaggeration=exaggeration)
         else:
@@ -266,7 +266,8 @@ class ChatterboxMultilingualTTS:
 
         # Norm and tokenize text
         text = punc_norm(text)
-        text_tokens = self.tokenizer.text_to_tokens(text, language_id=language_id.lower() if language_id else None).to(self.device)
+        text_tokens = self.tokenizer.text_to_tokens(text, language_id=language_id.lower() if language_id else None).to(
+            self.device)
         text_tokens = torch.cat([text_tokens, text_tokens], dim=0)  # Need two seqs for CFG
 
         sot = self.t3.hp.start_text_token

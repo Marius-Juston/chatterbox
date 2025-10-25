@@ -2,13 +2,11 @@
 # Author: John Meade, Jeremy Hsu
 # MIT License
 import logging
-import torch
 from dataclasses import dataclass
-from types import MethodType
 
+import torch
 
 logger = logging.getLogger(__name__)
-
 
 LLAMA_ALIGNED_HEADS = [(12, 15), (13, 11), (9, 2)]
 
@@ -42,7 +40,7 @@ class AlignmentStreamAnalyzer:
         # self.queue = queue
         self.text_tokens_slice = (i, j) = text_tokens_slice
         self.eos_idx = eos_idx
-        self.alignment = torch.zeros(0, j-i)
+        self.alignment = torch.zeros(0, j - i)
         # self.alignment_bin = torch.zeros(0, j-i)
         self.curr_frame_pos = 0
         self.text_position = 0
@@ -52,7 +50,7 @@ class AlignmentStreamAnalyzer:
 
         self.complete = False
         self.completed_at = None
-        
+
         # Track generated tokens for repetition detection
         self.generated_tokens = []
 
@@ -68,6 +66,7 @@ class AlignmentStreamAnalyzer:
         """
         Adds a forward hook to a specific attention layer to collect outputs.
         """
+
         def attention_forward_hook(module, input, output):
             """
             See `LlamaAttention.forward`; the output is a 3-tuple: `attn_output, attn_weights, past_key_value`.
@@ -91,18 +90,17 @@ class AlignmentStreamAnalyzer:
         Emits an AlignmentAnalysisResult into the output queue, and potentially modifies the logits to force an EOS.
         """
         # extract approximate alignment matrix chunk (1 frame at a time after the first chunk)
-        aligned_attn = torch.stack(self.last_aligned_attns).mean(dim=0) # (N, N)
+        aligned_attn = torch.stack(self.last_aligned_attns).mean(dim=0)  # (N, N)
         i, j = self.text_tokens_slice
         if self.curr_frame_pos == 0:
             # first chunk has conditioning info, text tokens, and BOS token
-            A_chunk = aligned_attn[j:, i:j].clone().cpu() # (T, S)
+            A_chunk = aligned_attn[j:, i:j].clone().cpu()  # (T, S)
         else:
             # subsequent chunks have 1 frame due to KV-caching
-            A_chunk = aligned_attn[:, i:j].clone().cpu() # (1, S)
+            A_chunk = aligned_attn[:, i:j].clone().cpu()  # (1, S)
 
         # TODO: monotonic masking; could have issue b/c spaces are often skipped.
         A_chunk[:, self.curr_frame_pos + 1:] = 0
-
 
         self.alignment = torch.cat((self.alignment, A_chunk), dim=0)
 
@@ -111,7 +109,7 @@ class AlignmentStreamAnalyzer:
 
         # update position
         cur_text_posn = A_chunk[-1].argmax()
-        discontinuity = not(-4 < cur_text_posn - self.text_position < 7) # NOTE: very lenient!
+        discontinuity = not (-4 < cur_text_posn - self.text_position < 7)  # NOTE: very lenient!
         if not discontinuity:
             self.text_position = cur_text_posn
 
@@ -133,11 +131,11 @@ class AlignmentStreamAnalyzer:
         last_text_token_duration = A[15:, -3:].sum()
 
         # Activations for the final token that last too long are likely hallucinations.
-        long_tail = self.complete and (A[self.completed_at:, -3:].sum(dim=0).max() >= 5) # 200ms
+        long_tail = self.complete and (A[self.completed_at:, -3:].sum(dim=0).max() >= 5)  # 200ms
 
         # If there are activations in previous tokens after generation has completed, assume this is a repetition error.
         alignment_repetition = self.complete and (A[self.completed_at:, :-5].max(dim=1).values.sum() > 5)
-        
+
         # Track generated tokens for repetition detection
         if next_token is not None:
             # Convert tensor to scalar if needed
@@ -146,33 +144,33 @@ class AlignmentStreamAnalyzer:
             else:
                 token_id = next_token
             self.generated_tokens.append(token_id)
-            
+
             # Keep only last 8 tokens to prevent memory issues
             if len(self.generated_tokens) > 8:
                 self.generated_tokens = self.generated_tokens[-8:]
-            
+
         # Check for excessive token repetition (3x same token in a row)
         token_repetition = (
             # self.complete and 
-            len(self.generated_tokens) >= 3 and
-            len(set(self.generated_tokens[-2:])) == 1
+                len(self.generated_tokens) >= 3 and
+                len(set(self.generated_tokens[-2:])) == 1
         )
-        
+
         if token_repetition:
             repeated_token = self.generated_tokens[-1]
             logger.warning(f"🚨 Detected 2x repetition of token {repeated_token}")
-            
+
         # Suppress EoS to prevent early termination
         if cur_text_posn < S - 3 and S > 5:  # Only suppress if text is longer than 5 tokens
-            logits[..., self.eos_idx] = -2**15
+            logits[..., self.eos_idx] = -2 ** 15
 
         # If a bad ending is detected, force emit EOS by modifying logits
         # NOTE: this means logits may be inconsistent with latents!
         if long_tail or alignment_repetition or token_repetition:
             logger.warning(f"forcing EOS token, {long_tail=}, {alignment_repetition=}, {token_repetition=}")
             # (±2**15 is safe for all dtypes >= 16bit)
-            logits = -(2**15) * torch.ones_like(logits)
-            logits[..., self.eos_idx] = 2**15
+            logits = -(2 ** 15) * torch.ones_like(logits)
+            logits[..., self.eos_idx] = 2 ** 15
 
         self.curr_frame_pos += 1
         return logits

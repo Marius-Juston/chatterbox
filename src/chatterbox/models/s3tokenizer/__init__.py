@@ -7,10 +7,8 @@ from .s3tokenizer import (
     S3Tokenizer,
 )
 
-
 SOS = SPEECH_VOCAB_SIZE
 EOS = SPEECH_VOCAB_SIZE + 1
-
 
 
 def drop_invalid_tokens(x):

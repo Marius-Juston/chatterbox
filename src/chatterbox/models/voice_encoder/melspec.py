@@ -1,8 +1,8 @@
 from functools import lru_cache
 
-from scipy import signal
-import numpy as np
 import librosa
+import numpy as np
+from scipy import signal
 
 
 @lru_cache()
@@ -47,8 +47,8 @@ def melspectrogram(wav, hp, pad=True):
     if hp.normalized_mels:
         mel = _normalize(mel, hp).astype(np.float32)
 
-    assert not pad or mel.shape[1] == 1 + len(wav) // hp.hop_size   # Sanity check
-    return mel   # (M, T)
+    assert not pad or mel.shape[1] == 1 + len(wav) // hp.hop_size  # Sanity check
+    return mel  # (M, T)
 
 
 def _stft(y, hp, pad=True):

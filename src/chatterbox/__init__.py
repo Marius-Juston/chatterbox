@@ -5,7 +5,6 @@ except ImportError:
 
 __version__ = version("chatterbox-tts")
 
-
+from .mtl_tts import ChatterboxMultilingualTTS, SUPPORTED_LANGUAGES
 from .tts import ChatterboxTTS
 from .vc import ChatterboxVC
-from .mtl_tts import ChatterboxMultilingualTTS, SUPPORTED_LANGUAGES

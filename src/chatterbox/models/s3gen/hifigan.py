@@ -18,17 +18,18 @@
 """HIFI-GAN"""
 
 from typing import Dict, Optional, List
+
 import numpy as np
-from scipy.signal import get_window
 import torch
 import torch.nn.functional as F
+from scipy.signal import get_window
+from torch import nn, sin, pow
+from torch.distributions.uniform import Uniform
 from torch.nn import Conv1d
 from torch.nn import ConvTranspose1d
+from torch.nn import Parameter
 from torch.nn.utils import remove_weight_norm
 from torch.nn.utils.parametrizations import weight_norm
-from torch.distributions.uniform import Uniform
-from torch import nn, sin, pow
-from torch.nn import Parameter
 
 
 class Snake(nn.Module):
@@ -47,6 +48,7 @@ class Snake(nn.Module):
         >>> x = torch.randn(256)
         >>> x = a1(x)
     '''
+
     def __init__(self, in_features, alpha=1.0, alpha_trainable=True, alpha_logscale=False):
         '''
         Initialization.
@@ -61,9 +63,9 @@ class Snake(nn.Module):
 
         # initialize alpha
         self.alpha_logscale = alpha_logscale
-        if self.alpha_logscale: # log scale alphas initialized to zeros
+        if self.alpha_logscale:  # log scale alphas initialized to zeros
             self.alpha = Parameter(torch.zeros(in_features) * alpha)
-        else: # linear scale alphas initialized to ones
+        else:  # linear scale alphas initialized to ones
             self.alpha = Parameter(torch.ones(in_features) * alpha)
 
         self.alpha.requires_grad = alpha_trainable
@@ -76,7 +78,7 @@ class Snake(nn.Module):
         Applies the function to the input elementwise.
         Snake ∶= x + 1/a * sin^2 (xa)
         '''
-        alpha = self.alpha.unsqueeze(0).unsqueeze(-1) # line up with x to [B, C, T]
+        alpha = self.alpha.unsqueeze(0).unsqueeze(-1)  # line up with x to [B, C, T]
         if self.alpha_logscale:
             alpha = torch.exp(alpha)
         x = x + (1.0 / (alpha + self.no_div_by_zero)) * pow(sin(x * alpha), 2)
@@ -84,9 +86,9 @@ class Snake(nn.Module):
         return x
 
 
-
 def get_padding(kernel_size, dilation=1):
     return int((kernel_size * dilation - dilation) / 2)
+
 
 def init_weights(m, mean=0.0, std=0.01):
     classname = m.__class__.__name__
@@ -105,11 +107,12 @@ This code is modified from https://github.com/jik876/hifi-gan
 
 class ResBlock(torch.nn.Module):
     """Residual block module in HiFiGAN/BigVGAN."""
+
     def __init__(
-        self,
-        channels: int = 512,
-        kernel_size: int = 3,
-        dilations: List[int] = [1, 3, 5],
+            self,
+            channels: int = 512,
+            kernel_size: int = 3,
+            dilations: List[int] = [1, 3, 5],
     ):
         super(ResBlock, self).__init__()
         self.convs1 = nn.ModuleList()
@@ -288,6 +291,7 @@ class HiFTGenerator(nn.Module):
     HiFTNet Generator: Neural Source Filter + ISTFTNet
     https://arxiv.org/abs/2309.09493
     """
+
     def __init__(
             self,
             in_channels: int = 80,
@@ -338,8 +342,8 @@ class HiFTGenerator(nn.Module):
             self.ups.append(
                 weight_norm(
                     ConvTranspose1d(
-                        base_channels // (2**i),
-                        base_channels // (2**(i + 1)),
+                        base_channels // (2 ** i),
+                        base_channels // (2 ** (i + 1)),
                         k,
                         u,
                         padding=(k - u) // 2,
@@ -352,7 +356,8 @@ class HiFTGenerator(nn.Module):
         self.source_resblocks = nn.ModuleList()
         downsample_rates = [1] + upsample_rates[::-1][:-1]
         downsample_cum_rates = np.cumprod(downsample_rates)
-        for i, (u, k, d) in enumerate(zip(downsample_cum_rates[::-1], source_resblock_kernel_sizes, source_resblock_dilation_sizes)):
+        for i, (u, k, d) in enumerate(
+                zip(downsample_cum_rates[::-1], source_resblock_kernel_sizes, source_resblock_dilation_sizes)):
             if u == 1:
                 self.source_downs.append(
                     Conv1d(istft_params["n_fft"] + 2, base_channels // (2 ** (i + 1)), 1, 1)
@@ -368,7 +373,7 @@ class HiFTGenerator(nn.Module):
 
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
-            ch = base_channels // (2**(i + 1))
+            ch = base_channels // (2 ** (i + 1))
             for _, (k, d) in enumerate(zip(resblock_kernel_sizes, resblock_dilation_sizes)):
                 self.resblocks.append(ResBlock(ch, k, d))
 
@@ -396,7 +401,8 @@ class HiFTGenerator(nn.Module):
     def _stft(self, x):
         spec = torch.stft(
             x,
-            self.istft_params["n_fft"], self.istft_params["hop_len"], self.istft_params["n_fft"], window=self.stft_window.to(x.device),
+            self.istft_params["n_fft"], self.istft_params["hop_len"], self.istft_params["n_fft"],
+            window=self.stft_window.to(x.device),
             return_complex=True)
         spec = torch.view_as_real(spec)  # [B, F, TT, 2]
         return spec[..., 0], spec[..., 1]
@@ -405,7 +411,8 @@ class HiFTGenerator(nn.Module):
         magnitude = torch.clip(magnitude, max=1e2)
         real = magnitude * torch.cos(phase)
         img = magnitude * torch.sin(phase)
-        inverse_transform = torch.istft(torch.complex(real, img), self.istft_params["n_fft"], self.istft_params["hop_len"],
+        inverse_transform = torch.istft(torch.complex(real, img), self.istft_params["n_fft"],
+                                        self.istft_params["hop_len"],
                                         self.istft_params["n_fft"], window=self.stft_window.to(magnitude.device))
         return inverse_transform
 

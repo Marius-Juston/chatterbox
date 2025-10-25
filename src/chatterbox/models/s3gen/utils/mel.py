@@ -1,11 +1,11 @@
 """mel-spectrogram extraction in Matcha-TTS"""
 import logging
-from librosa.filters import mel as librosa_mel_fn
-import torch
+
 import numpy as np
+import torch
+from librosa.filters import mel as librosa_mel_fn
 
 logger = logging.getLogger(__name__)
-
 
 # NOTE: they decalred these global vars
 mel_basis = {}
@@ -20,6 +20,7 @@ def spectral_normalize_torch(magnitudes):
     output = dynamic_range_compression_torch(magnitudes)
     return output
 
+
 """
 feat_extractor: !name:matcha.utils.audio.mel_spectrogram
     n_fft: 1920
@@ -33,6 +34,7 @@ feat_extractor: !name:matcha.utils.audio.mel_spectrogram
 
 """
 
+
 def mel_spectrogram(y, n_fft=1920, num_mels=80, sampling_rate=24000, hop_size=480, win_size=1920,
                     fmin=0, fmax=8000, center=False):
     """Copied from https://github.com/shivammehta25/Matcha-TTS/blob/main/matcha/utils/audio.py
@@ -43,7 +45,7 @@ def mel_spectrogram(y, n_fft=1920, num_mels=80, sampling_rate=24000, hop_size=48
         y = torch.tensor(y).float()
 
     if len(y.shape) == 1:
-        y = y[None, ]
+        y = y[None,]
 
     # Debug: Check for audio clipping (values outside [-1.0, 1.0] range)
     min_val = torch.min(y)

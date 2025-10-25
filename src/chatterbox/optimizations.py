@@ -11,7 +11,7 @@ This module provides:
 import logging
 import time
 from functools import wraps
-from typing import Optional, Callable
+from typing import Callable
 
 import torch
 import torch.nn as nn
@@ -63,10 +63,10 @@ class PerformanceOptimizer:
         logger.info("CUDA optimizations enabled: TF32 precision, cuDNN benchmark, memory optimization")
 
     def optimize_model(
-        self,
-        model: nn.Module,
-        compile_mode: str = "reduce-overhead",
-        compile_dynamic: bool = False
+            self,
+            model: nn.Module,
+            compile_mode: str = "reduce-overhead",
+            compile_dynamic: bool = False
     ) -> nn.Module:
         """
         Apply optimizations to a model
@@ -104,6 +104,7 @@ class PerformanceOptimizer:
         """
         Decorator to log inference timing
         """
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             start = time.time()
@@ -111,6 +112,7 @@ class PerformanceOptimizer:
             elapsed = (time.time() - start) * 1000
             logger.info(f"[TIMING] {func.__name__}: {elapsed:.1f}ms")
             return result
+
         return wrapper
 
 
@@ -148,14 +150,14 @@ def optimize_hifigan_inference(hifigan, enable_bf16: bool = True, enable_compile
             t0 = time.time()
             f0 = hifigan.f0_predictor(speech_feat)
             t1 = time.time()
-            logger.debug(f"[VOCODER] F0 prediction: {(t1-t0)*1000:.1f}ms")
+            logger.debug(f"[VOCODER] F0 prediction: {(t1 - t0) * 1000:.1f}ms")
 
             # f0->source
             s = hifigan.f0_upsamp(f0[:, None]).transpose(1, 2)
             s, _, _ = hifigan.m_source(s)
             s = s.transpose(1, 2)
             t2 = time.time()
-            logger.debug(f"[VOCODER] Source generation: {(t2-t1)*1000:.1f}ms")
+            logger.debug(f"[VOCODER] Source generation: {(t2 - t1) * 1000:.1f}ms")
 
             # use cache_source to avoid glitch
             if cache_source.shape[2] != 0:
@@ -164,14 +166,14 @@ def optimize_hifigan_inference(hifigan, enable_bf16: bool = True, enable_compile
             # decode (mel + source -> waveform)
             generated_speech = hifigan.decode(x=speech_feat, s=s)
             t3 = time.time()
-            logger.debug(f"[VOCODER] Decode: {(t3-t2)*1000:.1f}ms")
+            logger.debug(f"[VOCODER] Decode: {(t3 - t2) * 1000:.1f}ms")
 
         # Convert back to FP32 for compatibility after exiting autocast
         generated_speech = generated_speech.float()
         s = s.float()
 
         t_end = time.time()
-        logger.info(f"[VOCODER] Total inference: {(t_end-t_start)*1000:.1f}ms")
+        logger.info(f"[VOCODER] Total inference: {(t_end - t_start) * 1000:.1f}ms")
 
         return generated_speech, s
 
@@ -234,14 +236,14 @@ def optimize_flow_decoder(flow_model, n_timesteps: int = 4, enable_bf16: bool = 
 
     @torch.inference_mode()
     def optimized_inference(
-        token,
-        token_len,
-        prompt_token,
-        prompt_token_len,
-        prompt_feat,
-        prompt_feat_len,
-        embedding,
-        finalize,
+            token,
+            token_len,
+            prompt_token,
+            prompt_token_len,
+            prompt_feat,
+            prompt_feat_len,
+            embedding,
+            finalize,
     ):
         """Optimized flow inference with reduced timesteps and autocast"""
         t_start = time.time()
@@ -261,11 +263,11 @@ def optimize_flow_decoder(flow_model, n_timesteps: int = 4, enable_bf16: bool = 
             token, token_len = torch.concat([prompt_token, token], dim=1), prompt_token_len + token_len
             mask = (~make_pad_mask(token_len)).unsqueeze(-1).to(embedding)
             token = flow_model.input_embedding(
-                torch.clamp(token, min=0, max=flow_model.input_embedding.num_embeddings-1)
+                torch.clamp(token, min=0, max=flow_model.input_embedding.num_embeddings - 1)
             ) * mask
 
             t1 = time.time()
-            logger.debug(f"[FLOW] Embedding: {(t1-t0)*1000:.1f}ms")
+            logger.debug(f"[FLOW] Embedding: {(t1 - t0) * 1000:.1f}ms")
 
             # text encode
             h, h_lengths = flow_model.encoder(token, token_len)
@@ -275,7 +277,7 @@ def optimize_flow_decoder(flow_model, n_timesteps: int = 4, enable_bf16: bool = 
             h = flow_model.encoder_proj(h)
 
             t2 = time.time()
-            logger.debug(f"[FLOW] Encoding: {(t2-t1)*1000:.1f}ms")
+            logger.debug(f"[FLOW] Encoding: {(t2 - t1) * 1000:.1f}ms")
 
             # get conditions
             conds = torch.zeros([1, mel_len1 + mel_len2, flow_model.output_size], device=token.device).to(h.dtype)
@@ -296,7 +298,7 @@ def optimize_flow_decoder(flow_model, n_timesteps: int = 4, enable_bf16: bool = 
             )
 
             t4 = time.time()
-            logger.info(f"[FLOW] Decoder ({n_timesteps} steps): {(t4-t3)*1000:.1f}ms")
+            logger.info(f"[FLOW] Decoder ({n_timesteps} steps): {(t4 - t3) * 1000:.1f}ms")
 
             feat = feat[:, :, mel_len1:]
             assert feat.shape[2] == mel_len2
@@ -305,7 +307,7 @@ def optimize_flow_decoder(flow_model, n_timesteps: int = 4, enable_bf16: bool = 
         feat = feat.float()
 
         t_end = time.time()
-        logger.info(f"[FLOW] Total inference: {(t_end-t_start)*1000:.1f}ms")
+        logger.info(f"[FLOW] Total inference: {(t_end - t_start) * 1000:.1f}ms")
 
         return feat, None
 
@@ -351,7 +353,7 @@ def optimize_t3_model(t3_model, enable_bf16: bool = True, enable_compile: bool =
             result = original_inference(*args, **kwargs)
 
         t_end = time.time()
-        logger.info(f"[T3] Inference: {(t_end-t_start)*1000:.1f}ms")
+        logger.info(f"[T3] Inference: {(t_end - t_start) * 1000:.1f}ms")
         return result
 
     t3_model.inference = timed_inference_with_autocast
@@ -378,7 +380,8 @@ def optimize_s3gen_complete(s3gen, n_timesteps: int = 4, enable_bf16: bool = Tru
     """
     # Optimize flow decoder
     if hasattr(s3gen, 'flow'):
-        optimize_flow_decoder(s3gen.flow, n_timesteps=n_timesteps, enable_bf16=enable_bf16, enable_compile=enable_compile)
+        optimize_flow_decoder(s3gen.flow, n_timesteps=n_timesteps, enable_bf16=enable_bf16,
+                              enable_compile=enable_compile)
 
     # Optimize vocoder
     if hasattr(s3gen, 'mel2wav'):
@@ -389,11 +392,11 @@ def optimize_s3gen_complete(s3gen, n_timesteps: int = 4, enable_bf16: bool = Tru
 
 
 def optimize_chatterbox_tts(
-    tts_model,
-    n_timesteps: int = 4,
-    enable_bf16: bool = True,
-    enable_compile: bool = True,
-    disable_watermark: bool = False
+        tts_model,
+        n_timesteps: int = 4,
+        enable_bf16: bool = True,
+        enable_compile: bool = True,
+        disable_watermark: bool = False
 ):
     """
     Comprehensive ChatterBox TTS optimization
@@ -413,7 +416,8 @@ def optimize_chatterbox_tts(
 
     # Optimize S3Gen (flow + vocoder)
     if hasattr(tts_model, 's3gen'):
-        optimize_s3gen_complete(tts_model.s3gen, n_timesteps=n_timesteps, enable_bf16=enable_bf16, enable_compile=enable_compile)
+        optimize_s3gen_complete(tts_model.s3gen, n_timesteps=n_timesteps, enable_bf16=enable_bf16,
+                                enable_compile=enable_compile)
 
     # Optionally disable watermark
     if disable_watermark:
@@ -421,6 +425,7 @@ def optimize_chatterbox_tts(
             class NoOpWatermarker:
                 def apply_watermark(self, audio, sample_rate):
                     return audio
+
             tts_model.watermarker = NoOpWatermarker()
             logger.info("[CHATTERBOX] Watermarking disabled")
 

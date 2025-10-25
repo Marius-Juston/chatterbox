@@ -16,10 +16,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from einops import pack, rearrange, repeat
 
-from .utils.mask import add_optional_chunk_mask
 from .matcha.decoder import SinusoidalPosEmb, Block1D, ResnetBlock1D, Downsample1D, \
     TimestepEmbedding, Upsample1D
 from .matcha.transformer import BasicTransformerBlock
+from .utils.mask import add_optional_chunk_mask
 
 
 def mask_to_bias(mask: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
@@ -31,7 +31,6 @@ def mask_to_bias(mask: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
     #     chunk_masks = (1.0 - chunk_masks) * torch.finfo(dtype).min
     mask = (1.0 - mask) * -1.0e+10
     return mask
-
 
 
 class Transpose(torch.nn.Module):
@@ -70,17 +69,17 @@ class CausalResnetBlock1D(ResnetBlock1D):
 
 class CausalConv1d(torch.nn.Conv1d):
     def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        kernel_size: int,
-        stride: int = 1,
-        dilation: int = 1,
-        groups: int = 1,
-        bias: bool = True,
-        padding_mode: str = 'zeros',
-        device=None,
-        dtype=None
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            stride: int = 1,
+            dilation: int = 1,
+            groups: int = 1,
+            bias: bool = True,
+            padding_mode: str = 'zeros',
+            device=None,
+            dtype=None
     ) -> None:
         super(CausalConv1d, self).__init__(in_channels, out_channels,
                                            kernel_size, stride,
@@ -99,17 +98,17 @@ class CausalConv1d(torch.nn.Conv1d):
 
 class ConditionalDecoder(nn.Module):
     def __init__(
-        self,
-        in_channels=320,
-        out_channels=80,
-        causal=True,
-        channels=[256],
-        dropout=0.0,
-        attention_head_dim=64,
-        n_blocks=4,
-        num_mid_blocks=12,
-        num_heads=8,
-        act_fn="gelu",
+            self,
+            in_channels=320,
+            out_channels=80,
+            causal=True,
+            channels=[256],
+            dropout=0.0,
+            attention_head_dim=64,
+            n_blocks=4,
+            num_mid_blocks=12,
+            num_heads=8,
+            act_fn="gelu",
     ):
         """
         This decoder requires an input with the same shape of the target. So, if your text content
@@ -139,7 +138,8 @@ class ConditionalDecoder(nn.Module):
             input_channel = output_channel
             output_channel = channels[i]
             is_last = i == len(channels) - 1
-            resnet = CausalResnetBlock1D(dim=input_channel, dim_out=output_channel, time_emb_dim=time_embed_dim) if self.causal else \
+            resnet = CausalResnetBlock1D(dim=input_channel, dim_out=output_channel,
+                                         time_emb_dim=time_embed_dim) if self.causal else \
                 ResnetBlock1D(dim=input_channel, dim_out=output_channel, time_emb_dim=time_embed_dim)
             transformer_blocks = nn.ModuleList(
                 [
@@ -155,14 +155,17 @@ class ConditionalDecoder(nn.Module):
             )
             downsample = (
                 Downsample1D(output_channel) if not is_last else
-                CausalConv1d(output_channel, output_channel, 3) if self.causal else nn.Conv1d(output_channel, output_channel, 3, padding=1)
+                CausalConv1d(output_channel, output_channel, 3) if self.causal else nn.Conv1d(output_channel,
+                                                                                              output_channel, 3,
+                                                                                              padding=1)
             )
             self.down_blocks.append(nn.ModuleList([resnet, transformer_blocks, downsample]))
 
         for _ in range(num_mid_blocks):
             input_channel = channels[-1]
             out_channels = channels[-1]
-            resnet = CausalResnetBlock1D(dim=input_channel, dim_out=output_channel, time_emb_dim=time_embed_dim) if self.causal else \
+            resnet = CausalResnetBlock1D(dim=input_channel, dim_out=output_channel,
+                                         time_emb_dim=time_embed_dim) if self.causal else \
                 ResnetBlock1D(dim=input_channel, dim_out=output_channel, time_emb_dim=time_embed_dim)
 
             transformer_blocks = nn.ModuleList(
@@ -209,10 +212,13 @@ class ConditionalDecoder(nn.Module):
             upsample = (
                 Upsample1D(output_channel, use_conv_transpose=True)
                 if not is_last
-                else CausalConv1d(output_channel, output_channel, 3) if self.causal else nn.Conv1d(output_channel, output_channel, 3, padding=1)
+                else CausalConv1d(output_channel, output_channel, 3) if self.causal else nn.Conv1d(output_channel,
+                                                                                                   output_channel, 3,
+                                                                                                   padding=1)
             )
             self.up_blocks.append(nn.ModuleList([resnet, transformer_blocks, upsample]))
-        self.final_block = CausalBlock1D(channels[-1], channels[-1]) if self.causal else Block1D(channels[-1], channels[-1])
+        self.final_block = CausalBlock1D(channels[-1], channels[-1]) if self.causal else Block1D(channels[-1],
+                                                                                                 channels[-1])
         self.final_proj = nn.Conv1d(channels[-1], self.out_channels, 1)
         self.initialize_weights()
 

@@ -18,9 +18,9 @@
 import math
 from typing import Tuple, Union
 
+import numpy as np
 import torch
 import torch.nn.functional as F
-import numpy as np
 
 
 class PositionalEncoding(torch.nn.Module):
@@ -106,7 +106,7 @@ class PositionalEncoding(torch.nn.Module):
         else:  # for batched streaming decoding on GPU
             assert torch.max(offset) + size <= self.max_len
             index = offset.unsqueeze(1) + \
-                torch.arange(0, size).to(offset.device)  # B X T
+                    torch.arange(0, size).to(offset.device)  # B X T
             flag = index > 0
             # remove negative offset
             index = index * flag
@@ -158,7 +158,7 @@ class WhisperPositionalEncoding(PositionalEncoding):
         inv_timescales = torch.exp(-log_timescale_increment *
                                    torch.arange(d_model // 2))
         scaled_time = torch.arange(max_len)[:, np.newaxis] * \
-            inv_timescales[np.newaxis, :]
+                      inv_timescales[np.newaxis, :]
         pe = torch.cat([torch.sin(scaled_time), torch.cos(scaled_time)], dim=1)
         delattr(self, "pe")
         self.register_buffer("pe", pe.unsqueeze(0))

@@ -72,13 +72,13 @@ class Downsample1D(nn.Module):
 
 class TimestepEmbedding(nn.Module):
     def __init__(
-        self,
-        in_channels: int,
-        time_embed_dim: int,
-        act_fn: str = "silu",
-        out_dim: int = None,
-        post_act_fn: Optional[str] = None,
-        cond_proj_dim=None,
+            self,
+            in_channels: int,
+            time_embed_dim: int,
+            act_fn: str = "silu",
+            out_dim: int = None,
+            post_act_fn: Optional[str] = None,
+            cond_proj_dim=None,
     ):
         super().__init__()
 
@@ -160,18 +160,18 @@ class Upsample1D(nn.Module):
 
 class ConformerWrapper(ConformerBlock):
     def __init__(  # pylint: disable=useless-super-delegation
-        self,
-        *,
-        dim,
-        dim_head=64,
-        heads=8,
-        ff_mult=4,
-        conv_expansion_factor=2,
-        conv_kernel_size=31,
-        attn_dropout=0,
-        ff_dropout=0,
-        conv_dropout=0,
-        conv_causal=False,
+            self,
+            *,
+            dim,
+            dim_head=64,
+            heads=8,
+            ff_mult=4,
+            conv_expansion_factor=2,
+            conv_kernel_size=31,
+            attn_dropout=0,
+            ff_dropout=0,
+            conv_dropout=0,
+            conv_causal=False,
     ):
         super().__init__(
             dim=dim,
@@ -187,31 +187,31 @@ class ConformerWrapper(ConformerBlock):
         )
 
     def forward(
-        self,
-        hidden_states,
-        attention_mask,
-        encoder_hidden_states=None,
-        encoder_attention_mask=None,
-        timestep=None,
+            self,
+            hidden_states,
+            attention_mask,
+            encoder_hidden_states=None,
+            encoder_attention_mask=None,
+            timestep=None,
     ):
         return super().forward(x=hidden_states, mask=attention_mask.bool())
 
 
 class Decoder(nn.Module):
     def __init__(
-        self,
-        in_channels,
-        out_channels,
-        channels=(256, 256),
-        dropout=0.05,
-        attention_head_dim=64,
-        n_blocks=1,
-        num_mid_blocks=2,
-        num_heads=4,
-        act_fn="snake",
-        down_block_type="transformer",
-        mid_block_type="transformer",
-        up_block_type="transformer",
+            self,
+            in_channels,
+            out_channels,
+            channels=(256, 256),
+            dropout=0.05,
+            attention_head_dim=64,
+            n_blocks=1,
+            num_mid_blocks=2,
+            num_heads=4,
+            act_fn="snake",
+            down_block_type="transformer",
+            mid_block_type="transformer",
+            up_block_type="transformer",
     ):
         super().__init__()
         channels = tuple(channels)

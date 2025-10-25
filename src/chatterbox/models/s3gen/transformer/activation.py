@@ -47,6 +47,7 @@ class Snake(nn.Module):
         >>> x = torch.randn(256)
         >>> x = a1(x)
     '''
+
     def __init__(self, in_features, alpha=1.0, alpha_trainable=True, alpha_logscale=False):
         '''
         Initialization.

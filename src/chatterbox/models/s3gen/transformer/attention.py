@@ -51,7 +51,7 @@ class MultiHeadedAttention(nn.Module):
         self.dropout = nn.Dropout(p=dropout_rate)
 
     def forward_qkv(
-        self, query: torch.Tensor, key: torch.Tensor, value: torch.Tensor
+            self, query: torch.Tensor, key: torch.Tensor, value: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Transform query, key and value.
 
@@ -80,10 +80,10 @@ class MultiHeadedAttention(nn.Module):
         return q, k, v
 
     def forward_attention(
-        self,
-        value: torch.Tensor,
-        scores: torch.Tensor,
-        mask: torch.Tensor = torch.ones((0, 0, 0), dtype=torch.bool)
+            self,
+            value: torch.Tensor,
+            scores: torch.Tensor,
+            mask: torch.Tensor = torch.ones((0, 0, 0), dtype=torch.bool)
     ) -> torch.Tensor:
         """Compute attention context vector.
 
@@ -127,13 +127,13 @@ class MultiHeadedAttention(nn.Module):
         return self.linear_out(x)  # (batch, time1, d_model)
 
     def forward(
-        self,
-        query: torch.Tensor,
-        key: torch.Tensor,
-        value: torch.Tensor,
-        mask: torch.Tensor = torch.ones((0, 0, 0), dtype=torch.bool),
-        pos_emb: torch.Tensor = torch.empty(0),
-        cache: torch.Tensor = torch.zeros((0, 0, 0, 0))
+            self,
+            query: torch.Tensor,
+            key: torch.Tensor,
+            value: torch.Tensor,
+            mask: torch.Tensor = torch.ones((0, 0, 0), dtype=torch.bool),
+            pos_emb: torch.Tensor = torch.empty(0),
+            cache: torch.Tensor = torch.zeros((0, 0, 0, 0))
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Compute scaled dot product attention.
 
@@ -247,13 +247,13 @@ class RelPositionMultiHeadedAttention(MultiHeadedAttention):
         return x
 
     def forward(
-        self,
-        query: torch.Tensor,
-        key: torch.Tensor,
-        value: torch.Tensor,
-        mask: torch.Tensor = torch.ones((0, 0, 0), dtype=torch.bool),
-        pos_emb: torch.Tensor = torch.empty(0),
-        cache: torch.Tensor = torch.zeros((0, 0, 0, 0))
+            self,
+            query: torch.Tensor,
+            key: torch.Tensor,
+            value: torch.Tensor,
+            mask: torch.Tensor = torch.ones((0, 0, 0), dtype=torch.bool),
+            pos_emb: torch.Tensor = torch.empty(0),
+            cache: torch.Tensor = torch.zeros((0, 0, 0, 0))
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Compute 'Scaled Dot Product Attention' with rel. positional encoding.
         Args:

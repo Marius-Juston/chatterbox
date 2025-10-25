@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import threading
+
 import torch
 import torch.nn.functional as F
-from .matcha.flow_matching import BASECFM
+
 from .configs import CFM_PARAMS
+from .matcha.flow_matching import BASECFM
 
 
 class ConditionalCFM(BASECFM):
@@ -35,7 +37,8 @@ class ConditionalCFM(BASECFM):
         self.lock = threading.Lock()
 
     @torch.inference_mode()
-    def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None, prompt_len=0, flow_cache=torch.zeros(1, 80, 0, 2)):
+    def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None, prompt_len=0,
+                flow_cache=torch.zeros(1, 80, 0, 2)):
         """Forward diffusion
 
         Args:

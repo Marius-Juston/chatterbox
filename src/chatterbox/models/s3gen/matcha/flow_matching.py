@@ -8,11 +8,11 @@ from .decoder import Decoder
 
 class BASECFM(torch.nn.Module, ABC):
     def __init__(
-        self,
-        n_feats,
-        cfm_params,
-        n_spks=1,
-        spk_emb_dim=128,
+            self,
+            n_feats,
+            cfm_params,
+            n_spks=1,
+            spk_emb_dim=128,
     ):
         super().__init__()
         self.n_feats = n_feats
@@ -110,7 +110,7 @@ class BASECFM(torch.nn.Module, ABC):
         u = x1 - (1 - self.sigma_min) * z
 
         loss = F.mse_loss(self.estimator(y, mask, mu, t.squeeze(), spks), u, reduction="sum") / (
-            torch.sum(mask) * u.shape[1]
+                torch.sum(mask) * u.shape[1]
         )
         return loss, y
 

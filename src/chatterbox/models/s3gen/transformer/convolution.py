@@ -88,10 +88,10 @@ class ConvolutionModule(nn.Module):
         self.activation = activation
 
     def forward(
-        self,
-        x: torch.Tensor,
-        mask_pad: torch.Tensor = torch.ones((0, 0, 0), dtype=torch.bool),
-        cache: torch.Tensor = torch.zeros((0, 0, 0)),
+            self,
+            x: torch.Tensor,
+            mask_pad: torch.Tensor = torch.ones((0, 0, 0), dtype=torch.bool),
+            cache: torch.Tensor = torch.zeros((0, 0, 0)),
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Compute convolution module.
         Args:
