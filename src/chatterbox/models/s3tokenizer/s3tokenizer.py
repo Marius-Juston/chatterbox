@@ -1,15 +1,14 @@
 from typing import List, Tuple
 
-import numpy as np
 import librosa
+import numpy as np
 import torch
 import torch.nn.functional as F
-from s3tokenizer.utils import padding
 from s3tokenizer.model_v2 import (
     S3TokenizerV2,
     ModelConfig,
 )
-
+from s3tokenizer.utils import padding
 
 # Sampling rate of the inputs to S3TokenizerV2
 S3_SR = 16_000
@@ -29,9 +28,9 @@ class S3Tokenizer(S3TokenizerV2):
     ignore_state_dict_missing = ("_mel_filters", "window")
 
     def __init__(
-        self,
-        name: str="speech_tokenizer_v2_25hz",
-        config: ModelConfig = ModelConfig()
+            self,
+            name: str = "speech_tokenizer_v2_25hz",
+            config: ModelConfig = ModelConfig()
     ):
         super().__init__(name)
 
@@ -89,10 +88,10 @@ class S3Tokenizer(S3TokenizerV2):
 
     @torch.no_grad()
     def forward(
-        self,
-        wavs: torch.Tensor,
-        accelerator: 'Accelerator'=None,
-        max_len: int=None,
+            self,
+            wavs: torch.Tensor,
+            accelerator: 'Accelerator' = None,
+            max_len: int = None,
     ) -> Tuple[torch.Tensor, torch.LongTensor]:
         """
         NOTE: mel-spec has a hop size of 160 points (100 frame/sec).
@@ -126,9 +125,9 @@ class S3Tokenizer(S3TokenizerV2):
         )
 
     def log_mel_spectrogram(
-        self,
-        audio: torch.Tensor,
-        padding: int = 0,
+            self,
+            audio: torch.Tensor,
+            padding: int = 0,
     ):
         """
         Compute the log-Mel spectrogram of
@@ -158,7 +157,7 @@ class S3Tokenizer(S3TokenizerV2):
             window=self.window.to(self.device),
             return_complex=True
         )
-        magnitudes = stft[..., :-1].abs()**2
+        magnitudes = stft[..., :-1].abs() ** 2
 
         mel_spec = self._mel_filters.to(self.device) @ magnitudes
 

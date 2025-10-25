@@ -14,7 +14,6 @@ def sequence_mask(length, max_length=None):
     return x.unsqueeze(0) < length.unsqueeze(1)
 
 
-
 class LayerNorm(nn.Module):
     def __init__(self, channels, eps=1e-4):
         super().__init__()
@@ -164,7 +163,7 @@ class RotaryPositionalEmbeddings(nn.Module):
         self._build_cache(x)
 
         # Split the features, we can choose to apply rotary embeddings only to a partial set of features.
-        x_rope, x_pass = x[..., : self.d], x[..., self.d :]
+        x_rope, x_pass = x[..., : self.d], x[..., self.d:]
 
         # Calculate
         # $[-x^{(\frac{d}{2} + 1)}, -x^{(\frac{d}{2} + 2)}, ..., -x^{(d)}, x^{(1)}, x^{(2)}, ..., x^{(\frac{d}{2})}]$
@@ -177,14 +176,14 @@ class RotaryPositionalEmbeddings(nn.Module):
 
 class MultiHeadAttention(nn.Module):
     def __init__(
-        self,
-        channels,
-        out_channels,
-        n_heads,
-        heads_share=True,
-        p_dropout=0.0,
-        proximal_bias=False,
-        proximal_init=False,
+            self,
+            channels,
+            out_channels,
+            n_heads,
+            heads_share=True,
+            p_dropout=0.0,
+            proximal_bias=False,
+            proximal_init=False,
     ):
         super().__init__()
         assert channels % n_heads == 0
@@ -278,14 +277,14 @@ class FFN(nn.Module):
 
 class Encoder(nn.Module):
     def __init__(
-        self,
-        hidden_channels,
-        filter_channels,
-        n_heads,
-        n_layers,
-        kernel_size=1,
-        p_dropout=0.0,
-        **kwargs,
+            self,
+            hidden_channels,
+            filter_channels,
+            n_heads,
+            n_layers,
+            kernel_size=1,
+            p_dropout=0.0,
+            **kwargs,
     ):
         super().__init__()
         self.hidden_channels = hidden_channels
@@ -330,13 +329,13 @@ class Encoder(nn.Module):
 
 class TextEncoder(nn.Module):
     def __init__(
-        self,
-        encoder_type,
-        encoder_params,
-        duration_predictor_params,
-        n_vocab,
-        n_spks=1,
-        spk_emb_dim=128,
+            self,
+            encoder_type,
+            encoder_params,
+            duration_predictor_params,
+            n_vocab,
+            n_spks=1,
+            spk_emb_dim=128,
     ):
         super().__init__()
         self.encoder_type = encoder_type
@@ -347,7 +346,7 @@ class TextEncoder(nn.Module):
         self.n_spks = n_spks
 
         self.emb = torch.nn.Embedding(n_vocab, self.n_channels)
-        torch.nn.init.normal_(self.emb.weight, 0.0, self.n_channels**-0.5)
+        torch.nn.init.normal_(self.emb.weight, 0.0, self.n_channels ** -0.5)
 
         if encoder_params.prenet:
             self.prenet = ConvReluNorm(

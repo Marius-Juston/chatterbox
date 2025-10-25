@@ -1,7 +1,7 @@
 # Copyright (c) 2025 Resemble AI
 # MIT License
 import logging
-from typing import Union, Optional, List
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +20,6 @@ from .llama_configs import LLAMA_CONFIGS
 from .inference.t3_hf_backend import T3HuggingfaceBackend
 from .inference.alignment_stream_analyzer import AlignmentStreamAnalyzer
 from ..utils import AttrDict
-
-
-logger = logging.getLogger(__name__)
 
 
 def _ensure_BOT_EOT(text_tokens: Tensor, hp):
@@ -89,16 +86,16 @@ class T3(nn.Module):
         """
         if t3_cond.cond_prompt_speech_tokens is not None and t3_cond.cond_prompt_speech_emb is None:
             t3_cond.cond_prompt_speech_emb = self.speech_emb(t3_cond.cond_prompt_speech_tokens) + \
-                self.speech_pos_emb(t3_cond.cond_prompt_speech_tokens)
+                                             self.speech_pos_emb(t3_cond.cond_prompt_speech_tokens)
         return self.cond_enc(t3_cond)  # (B, len_cond, dim)
 
     def prepare_input_embeds(
-        self,
-        *,
-        t3_cond: T3Cond,
-        text_tokens: torch.LongTensor,
-        speech_tokens: torch.LongTensor,
-        cfg_weight: float = 0.0,
+            self,
+            *,
+            t3_cond: T3Cond,
+            text_tokens: torch.LongTensor,
+            speech_tokens: torch.LongTensor,
+            cfg_weight: float = 0.0,
     ):
         # prepare input embeddings (skip backbone tranformer embeddings)
         cond_emb = self.prepare_conditioning(t3_cond)  # (B, len_cond, dim)
@@ -113,7 +110,7 @@ class T3(nn.Module):
         len_cond = cond_emb.size(1)
 
         if cond_emb.size(0) != text_emb.size(0):
-             cond_emb = cond_emb.expand(text_emb.size(0), -1, -1)
+            cond_emb = cond_emb.expand(text_emb.size(0), -1, -1)
 
         # concat
         embeds = torch.stack([
@@ -123,14 +120,14 @@ class T3(nn.Module):
         return embeds, len_cond
 
     def forward(
-        self,
-        *,
-        t3_cond: T3Cond,
-        text_tokens: torch.LongTensor,
-        text_token_lens: torch.LongTensor,
-        speech_tokens: torch.LongTensor,
-        speech_token_lens: torch.LongTensor,
-        training=False,
+            self,
+            *,
+            t3_cond: T3Cond,
+            text_tokens: torch.LongTensor,
+            text_token_lens: torch.LongTensor,
+            speech_tokens: torch.LongTensor,
+            speech_token_lens: torch.LongTensor,
+            training=False,
     ):
         _ensure_BOT_EOT(text_tokens, self.hp)
 
@@ -180,13 +177,13 @@ class T3(nn.Module):
         )
 
     def loss(
-        self,
-        *,
-        t3_cond: T3Cond,
-        text_tokens: torch.LongTensor,
-        text_token_lens: torch.LongTensor,
-        speech_tokens: torch.LongTensor,
-        speech_token_lens: torch.LongTensor,
+            self,
+            *,
+            t3_cond: T3Cond,
+            text_tokens: torch.LongTensor,
+            text_token_lens: torch.LongTensor,
+            speech_tokens: torch.LongTensor,
+            speech_token_lens: torch.LongTensor,
     ):
         "training method"
         len_text = text_tokens.size(1)
@@ -217,26 +214,26 @@ class T3(nn.Module):
 
     @torch.inference_mode()
     def inference(
-        self,
-        *,
-        t3_cond: T3Cond,
-        text_tokens: Tensor,
-        initial_speech_tokens: Optional[Tensor]=None,
+            self,
+            *,
+            t3_cond: T3Cond,
+            text_tokens: Tensor,
+            initial_speech_tokens: Optional[Tensor] = None,
 
-        # misc conditioning
-        prepend_prompt_speech_tokens: Optional[Tensor]=None,
+            # misc conditioning
+            prepend_prompt_speech_tokens: Optional[Tensor] = None,
 
-        # HF generate args
-        num_return_sequences=1,
-        max_new_tokens=None,
-        stop_on_eos=True,
-        do_sample=True,
-        temperature=0.8,
-        top_p=0.95,
-        min_p=0.05,
-        length_penalty=1.0,
-        repetition_penalty=1.2,
-        cfg_weight=0.5,
+            # HF generate args
+            num_return_sequences=1,
+            max_new_tokens=None,
+            stop_on_eos=True,
+            do_sample=True,
+            temperature=0.8,
+            top_p=0.95,
+            min_p=0.05,
+            length_penalty=1.0,
+            repetition_penalty=1.2,
+            cfg_weight=0.5,
     ):
         """
         Args:
@@ -274,7 +271,7 @@ class T3(nn.Module):
                     self.tfmr,
                     None,
                     text_tokens_slice=(len_cond, len_cond + text_tokens.size(-1)),
-                    alignment_layer_idx=9, # TODO: hparam or something?
+                    alignment_layer_idx=9,  # TODO: hparam or something?
                     eos_idx=self.hp.stop_speech_token,
                 )
                 assert alignment_stream_analyzer.eos_idx == self.hp.stop_speech_token
@@ -342,29 +339,29 @@ class T3(nn.Module):
 
         # ---- Generation Loop using kv_cache ----
         for i in tqdm(range(max_new_tokens), desc="Sampling", dynamic_ncols=True):
-            logits_step = output.logits[:, -1, :]                
+            logits_step = output.logits[:, -1, :]
             # CFG combine  → (1, V)
-            cond   = logits_step[0:1, :]
+            cond = logits_step[0:1, :]
             uncond = logits_step[1:2, :]
             cfg = torch.as_tensor(cfg_weight, device=cond.device, dtype=cond.dtype)
             logits = cond + cfg * (cond - uncond)
-            
+
             # Apply alignment stream analyzer integrity checks
             if self.patched_model.alignment_stream_analyzer is not None:
-                if logits.dim() == 1:            # guard in case something upstream squeezed
-                    logits = logits.unsqueeze(0) # (1, V)
+                if logits.dim() == 1:  # guard in case something upstream squeezed
+                    logits = logits.unsqueeze(0)  # (1, V)
                 # Pass the last generated token for repetition tracking
                 last_token = generated_ids[0, -1].item() if len(generated_ids[0]) > 0 else None
                 logits = self.patched_model.alignment_stream_analyzer.step(logits, next_token=last_token)  # (1, V)
 
             # Apply repetition penalty
-            ids_for_proc = generated_ids[:1, ...]   # batch = 1
+            ids_for_proc = generated_ids[:1, ...]  # batch = 1
             logits = repetition_penalty_processor(ids_for_proc, logits)  # expects (B,V)
-            
+
             # Apply temperature scaling.
             if temperature != 1.0:
                 logits = logits / temperature
-                
+
             # Apply min_p and top_p filtering
             logits = min_p_warper(ids_for_proc, logits)
             logits = top_p_warper(ids_for_proc, logits)
@@ -378,7 +375,7 @@ class T3(nn.Module):
 
             # Check for EOS token.
             if next_token.view(-1) == self.hp.stop_speech_token:
-                logger.info(f"✅ EOS token detected! Stopping generation at step {i+1}")
+                logger.info(f"✅ EOS token detected! Stopping generation at step {i + 1}")
                 break
 
             # Get embedding for the new token.
