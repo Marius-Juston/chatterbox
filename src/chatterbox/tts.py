@@ -1,20 +1,21 @@
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
-import warnings
+from typing import Optional, Tuple
 
 import librosa
-import torch
 import perth
+import torch
 import torch.nn.functional as F
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 
-from .models.t3 import T3
-from .models.s3tokenizer import S3_SR, drop_invalid_tokens
 from .models.s3gen import S3GEN_SR, S3Gen
+from .models.s3tokenizer import S3_SR, drop_invalid_tokens
+from .models.t3 import T3
+from .models.t3.modules.cond_enc import T3Cond
 from .models.tokenizers import EnTokenizer
 from .models.voice_encoder import VoiceEncoder
-from .models.t3.modules.cond_enc import T3Cond
 
 # Suppress known deprecation warnings from external libraries
 warnings.filterwarnings('ignore', message='.*LoRACompatibleLinear.*', category=FutureWarning)
@@ -113,13 +114,13 @@ class ChatterboxTTS:
     DEC_COND_LEN = 10 * S3GEN_SR
 
     def __init__(
-        self,
-        t3: T3,
-        s3gen: S3Gen,
-        ve: VoiceEncoder,
-        tokenizer: EnTokenizer,
-        device: str,
-        conds: Conditionals = None,
+            self,
+            t3: T3,
+            s3gen: S3Gen,
+            ve: VoiceEncoder,
+            tokenizer: EnTokenizer,
+            device: str,
+            conds: Conditionals = None,
     ):
         self.sr = S3GEN_SR  # sample rate of synthesized audio
         self.t3 = t3
@@ -176,7 +177,8 @@ class ChatterboxTTS:
             if not torch.backends.mps.is_built():
                 print("MPS not available because the current PyTorch install was not built with MPS enabled.")
             else:
-                print("MPS not available because the current MacOS version is not 12.3+ and/or you do not have an MPS-enabled device on this machine.")
+                print(
+                    "MPS not available because the current MacOS version is not 12.3+ and/or you do not have an MPS-enabled device on this machine.")
             device = "cpu"
 
         for fpath in ["ve.safetensors", "t3_cfg.safetensors", "s3gen.safetensors", "tokenizer.json", "conds.pt"]:
@@ -258,14 +260,9 @@ class ChatterboxTTS:
                 min_p=min_p,
                 top_p=top_p,
             )
-            # Extract only the conditional batch.
             speech_tokens = speech_tokens[0]
-
-            # TODO: output becomes 1D
             speech_tokens = drop_invalid_tokens(speech_tokens)
-            
             speech_tokens = speech_tokens[speech_tokens < 6561]
-
             speech_tokens = speech_tokens.to(self.device)
 
             wav, _ = self.s3gen.inference(

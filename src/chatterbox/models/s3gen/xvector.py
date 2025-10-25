@@ -6,6 +6,7 @@
 
 
 from collections import OrderedDict
+
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint as cp
@@ -159,20 +160,20 @@ class StatsPool(torch.nn.Module):
 
 class TDNNLayer(torch.nn.Module):
     def __init__(
-        self,
-        in_channels,
-        out_channels,
-        kernel_size,
-        stride=1,
-        padding=0,
-        dilation=1,
-        bias=False,
-        config_str="batchnorm-relu",
+            self,
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=1,
+            padding=0,
+            dilation=1,
+            bias=False,
+            config_str="batchnorm-relu",
     ):
         super(TDNNLayer, self).__init__()
         if padding < 0:
             assert (
-                kernel_size % 2 == 1
+                    kernel_size % 2 == 1
             ), "Expect equal paddings, but got even kernel size ({})".format(kernel_size)
             padding = (kernel_size - 1) // 2 * dilation
         self.linear = torch.nn.Conv1d(
@@ -194,7 +195,7 @@ class TDNNLayer(torch.nn.Module):
 
 class CAMLayer(torch.nn.Module):
     def __init__(
-        self, bn_channels, out_channels, kernel_size, stride, padding, dilation, bias, reduction=2
+            self, bn_channels, out_channels, kernel_size, stride, padding, dilation, bias, reduction=2
     ):
         super(CAMLayer, self).__init__()
         self.linear_local = torch.nn.Conv1d(
@@ -233,16 +234,16 @@ class CAMLayer(torch.nn.Module):
 
 class CAMDenseTDNNLayer(torch.nn.Module):
     def __init__(
-        self,
-        in_channels,
-        out_channels,
-        bn_channels,
-        kernel_size,
-        stride=1,
-        dilation=1,
-        bias=False,
-        config_str="batchnorm-relu",
-        memory_efficient=False,
+            self,
+            in_channels,
+            out_channels,
+            bn_channels,
+            kernel_size,
+            stride=1,
+            dilation=1,
+            bias=False,
+            config_str="batchnorm-relu",
+            memory_efficient=False,
     ):
         super(CAMDenseTDNNLayer, self).__init__()
         assert kernel_size % 2 == 1, "Expect equal paddings, but got even kernel size ({})".format(
@@ -277,17 +278,17 @@ class CAMDenseTDNNLayer(torch.nn.Module):
 
 class CAMDenseTDNNBlock(torch.nn.ModuleList):
     def __init__(
-        self,
-        num_layers,
-        in_channels,
-        out_channels,
-        bn_channels,
-        kernel_size,
-        stride=1,
-        dilation=1,
-        bias=False,
-        config_str="batchnorm-relu",
-        memory_efficient=False,
+            self,
+            num_layers,
+            in_channels,
+            out_channels,
+            bn_channels,
+            kernel_size,
+            stride=1,
+            dilation=1,
+            bias=False,
+            config_str="batchnorm-relu",
+            memory_efficient=False,
     ):
         super(CAMDenseTDNNBlock, self).__init__()
         for i in range(num_layers):
@@ -336,19 +337,20 @@ class DenseLayer(torch.nn.Module):
         x = self.nonlinear(x)
         return x
 
+
 # @tables.register("model_classes", "CAMPPlus")
 class CAMPPlus(torch.nn.Module):
     def __init__(
-        self,
-        feat_dim=80,
-        embedding_size=192,
-        growth_rate=32,
-        bn_size=4,
-        init_channels=128,
-        config_str="batchnorm-relu",
-        memory_efficient=True,
-        output_level="segment",
-        **kwargs,
+            self,
+            feat_dim=80,
+            embedding_size=192,
+            growth_rate=32,
+            bn_size=4,
+            init_channels=128,
+            config_str="batchnorm-relu",
+            memory_efficient=True,
+            output_level="segment",
+            **kwargs,
     ):
         super().__init__()
 
@@ -376,7 +378,7 @@ class CAMPPlus(torch.nn.Module):
         )
         channels = init_channels
         for i, (num_layers, kernel_size, dilation) in enumerate(
-            zip((12, 24, 16), (3, 3, 3), (1, 2, 2))
+                zip((12, 24, 16), (3, 3, 3), (1, 2, 2))
         ):
             block = CAMDenseTDNNBlock(
                 num_layers=num_layers,
@@ -405,7 +407,7 @@ class CAMPPlus(torch.nn.Module):
             )
         else:
             assert (
-                self.output_level == "frame"
+                    self.output_level == "frame"
             ), "`output_level` should be set to 'segment' or 'frame'. "
 
         for m in self.modules():

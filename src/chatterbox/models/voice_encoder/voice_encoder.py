@@ -2,18 +2,18 @@
 # MIT License
 from typing import List, Union, Optional
 
-import numpy as np
-from numpy.lib.stride_tricks import as_strided
 import librosa
+import numpy as np
 import torch
 import torch.nn.functional as F
+from numpy.lib.stride_tricks import as_strided
 from torch import nn, Tensor
 
 from .config import VoiceEncConfig
 from .melspec import melspectrogram
 
 
-def pack(arrays, seq_len: int=None, pad_value=0):
+def pack(arrays, seq_len: int = None, pad_value=0):
     """
     Given a list of length B of array-like objects of shapes (Ti, ...), packs them in a single tensor of
     shape (B, T, ...) by padding each individual array on the right.
@@ -52,10 +52,10 @@ def pack(arrays, seq_len: int=None, pad_value=0):
 
 
 def get_num_wins(
-    n_frames: int,
-    step: int,
-    min_coverage: float,
-    hp: VoiceEncConfig,
+        n_frames: int,
+        step: int,
+        min_coverage: float,
+        hp: VoiceEncConfig,
 ):
     assert n_frames > 0
     win_size = hp.ve_partial_frames
@@ -67,9 +67,9 @@ def get_num_wins(
 
 
 def get_frame_step(
-    overlap: float,
-    rate: float,
-    hp: VoiceEncConfig,
+        overlap: float,
+        rate: float,
+        hp: VoiceEncConfig,
 ):
     # Compute how many frames separate two partial utterances
     assert 0 <= overlap < 1
@@ -82,11 +82,11 @@ def get_frame_step(
 
 
 def stride_as_partials(
-    mel: np.ndarray,
-    hp: VoiceEncConfig,
-    overlap=0.5,
-    rate: float=None,
-    min_coverage=0.8,
+        mel: np.ndarray,
+        hp: VoiceEncConfig,
+        overlap=0.5,
+        rate: float = None,
+        min_coverage=0.8,
 ):
     """
     Takes unscaled mels in (T, M) format
@@ -159,7 +159,8 @@ class VoiceEncoder(nn.Module):
         # L2 normalize the embeddings.
         return raw_embeds / torch.linalg.norm(raw_embeds, dim=1, keepdim=True)
 
-    def inference(self, mels: torch.Tensor, mel_lens, overlap=0.5, rate: float=None, min_coverage=0.8, batch_size=None):
+    def inference(self, mels: torch.Tensor, mel_lens, overlap=0.5, rate: float = None, min_coverage=0.8,
+                  batch_size=None):
         """
         Computes the embeddings of a batch of full utterances with gradients.
 
@@ -218,7 +219,7 @@ class VoiceEncoder(nn.Module):
         return embeds_x @ embeds_y
 
     def embeds_from_mels(
-        self, mels: Union[Tensor, List[np.ndarray]], mel_lens=None, as_spk=False, batch_size=32, **kwargs
+            self, mels: Union[Tensor, List[np.ndarray]], mel_lens=None, as_spk=False, batch_size=32, **kwargs
     ):
         """
         Convenience function for deriving utterance or speaker embeddings from mel spectrograms.
@@ -244,13 +245,13 @@ class VoiceEncoder(nn.Module):
         return self.utt_to_spk_embed(utt_embeds) if as_spk else utt_embeds
 
     def embeds_from_wavs(
-        self,
-        wavs: List[np.ndarray],
-        sample_rate,
-        as_spk=False,
-        batch_size=32,
-        trim_top_db: Optional[float]=20,
-        **kwargs
+            self,
+            wavs: List[np.ndarray],
+            sample_rate,
+            as_spk=False,
+            batch_size=32,
+            trim_top_db: Optional[float] = 20,
+            **kwargs
     ):
         """
         Wrapper around embeds_from_mels
